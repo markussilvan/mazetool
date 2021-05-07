@@ -31,7 +31,7 @@ where T: UserInterface
 		{
 			ui_type: PhantomData,
 			to_ui_tx: None,
-			maze: Arc::new(Mutex::new(Maze::default())),
+			maze: Arc::new(Mutex::new(Maze::new())),
 		};
 		return mc;
 	}
@@ -62,8 +62,7 @@ where T: UserInterface
 							self.generate_maze(dimensions);
 						},
 						Job::SolveMaze => {
-							//TODO: self.solve_maze();
-							self.show_error("Not implemented".to_string());
+							self.solve_maze();
 						},
 						Job::Quit => {
 							break;
@@ -106,6 +105,19 @@ where T: UserInterface
 		if let Some(ref channel) = self.to_ui_tx
 		{
 			channel.send(UIRequest::ShowMaze(self.maze.clone())).unwrap_or_else(|_| return);
+			channel.send(UIRequest::Quit).unwrap_or_else(|_| return);
+		}
+	}
+
+	/// Solve an already generated maze
+	///
+	/// Find a path through the maze
+	fn solve_maze(&self)
+	{
+		self.show_error("Solving a maze is not yet implemented".to_string());
+		if let Some(ref channel) = self.to_ui_tx
+		{
+			channel.send(UIRequest::Quit).unwrap_or_else(|_| return);
 		}
 	}
 }

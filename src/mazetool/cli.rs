@@ -1,14 +1,12 @@
 // Mazetool - command line user interface
 
 use std::env;
-use std::io;
-use std::io::Write;
 use std::sync::mpsc::*;
 use std::sync::{ Arc, Mutex };
 use std::thread;
 
 use mazetool::userinterface::UserInterface;
-use mazetool::common::ApplicationError;
+//use mazetool::common::ApplicationError;
 use mazetool::common::{ UIRequest, Job };
 use mazetool::maze::{ Dimensions, Maze, MAZE_DIMENSION_MIN, MAZE_DIMENSION_MAX, MAZE_DIMENSION_DEFAULT };
 
@@ -29,55 +27,6 @@ impl CommandLineInterface
 		println!("  generate        Generate a new random maze of given size");
 		println!("  solve           Solve a given maze");
 		println!("  help            Print this help");
-	}
-
-	/// Get a food item from user input
-	//fn get_maze_parameters(&self) -> Result<FoodItem, ApplicationError>
-	//{
-	//	let mut item = FoodItem::new(0, "Coca-Cola", 100, 137);
-	//	println!("Enter information for new food item");
-	//	match self.read_string("Name")
-	//	{
-	//		Ok(value) => item.name = value,
-	//		Err(x) => return Err(x),
-	//	}
-	//	match self.read_integer_value("Weight (g)")
-	//	{
-	//		Ok(value) => item.weight = value as u16,
-	//		Err(x) => return Err(x),
-	//	}
-	//	match self.read_integer_value("Energy (kJ)")
-	//	{
-	//		Ok(value) => item.energy = value as u16,
-	//		Err(x) => return Err(x),
-	//	}
-	//	Ok(item)
-	//}
-
-	/// Read a trimmed string from the user input
-	fn read_string(&self, prompt: &str) -> Result<String, ApplicationError>
-	{
-		let mut input_text = String::new();
-		print!("{}: ", prompt);
-		io::stdout().flush()?;
-		io::stdin().read_line(&mut input_text)?;
-		let trimmed = input_text.trim();
-		Ok(trimmed.to_string())
-	}
-
-	/// Read a integer value from the user input
-	fn read_integer_value(&self, prompt: &str) -> Result<u32, ApplicationError>
-	{
-		let input = match self.read_string(prompt)
-		{
-			Ok(x) => x,
-			Err(e) => return Err(e),
-		};
-		match input.parse::<u32>()
-		{
-			Ok(value) => return Ok(value),
-			Err(_) => return Err(ApplicationError::new("Input was not an integer")),
-		};
 	}
 
 	/// Show an info message in the user interface
@@ -156,7 +105,6 @@ impl CommandLineInterface
 			},
 			UIRequest::ShowMaze(maze) => {
 				self.show_maze(maze);
-				keep_running = false;
 			},
 			UIRequest::Quit => {
 				keep_running = false;
@@ -255,11 +203,12 @@ impl UserInterface for CommandLineInterface
 			},
 			"solve" => {
 				info!("Solve requested");
-				println!("Solve not yet implemented");
-
-				//TODO: get maze filename? (optional?)
-
-				return false;
+				if args.len() != 2
+				{
+					info!("Invalid parameters");
+					return false;
+				}
+				tx.send(Job::SolveMaze).unwrap_or_else(|_| return);
 			},
 			"help" | _ => {
 				self.print_usage(program);

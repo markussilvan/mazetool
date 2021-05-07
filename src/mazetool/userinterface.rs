@@ -4,7 +4,7 @@ use std::thread;
 
 use mazetool::common::{ Job, UIRequest };
 
-/// Trait for features required from a Foodie user interface
+/// Trait for features required from a Mazetool user interface
 pub trait UserInterface
 {
 	fn new() -> Self;

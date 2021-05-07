@@ -16,22 +16,21 @@ pub struct Dimensions
 #[derive(Debug, Clone)]
 pub enum MazeCellType
 {
-	WALL,
-	PASSAGE,
-	START,
-	END
+	Wall,
+	Passage,
+	Start,
+	End
 }
 
 impl Display for MazeCellType
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result
 	{
-		let c = match self {
-			WALL => '█',
-			PASSAGE => ' ',
-			START => 'S',
-			END => 'E',
-			_ => '?',
+		let c = match &*self {
+			MazeCellType::Wall => '█',
+			MazeCellType::Passage => ' ',
+			MazeCellType::Start => 'S',
+			MazeCellType::End => 'E',
 		};
         write!(f, "{}", c)
     }
@@ -64,16 +63,15 @@ impl std::fmt::Debug for Maze
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result
 	{
-        f.debug_struct("Maze {}");
-		Ok(())
+		f.debug_struct("Maze {}").finish()
     }
 }
 
 impl Maze
 {
-	pub fn default() -> Maze
+	pub fn new() -> Maze
 	{
-		let default_cell = MazeCell { celltype: MazeCellType::WALL, visited: false };
+		let default_cell = MazeCell { celltype: MazeCellType::Wall, visited: false };
 		let maze = Maze {
 			cells: vec![default_cell; MAZE_DIMENSION_DEFAULT * MAZE_DIMENSION_DEFAULT],
 			dimensions: Dimensions {
@@ -85,15 +83,6 @@ impl Maze
 		return maze;
 	}
 
-	pub fn new(dim: Dimensions) -> Maze
-	{
-		let maze = Maze {
-			cells: Vec::with_capacity(dim.width * dim.height),
-			dimensions: dim,
-		};
-		return maze;
-	}
-
 	pub fn reset(&mut self, dimensions: Dimensions)
 	{
 		let new_size = dimensions.width * dimensions.height;
@@ -102,13 +91,13 @@ impl Maze
 
 		if self.cells.len() != new_size
 		{
-			let default_cell = MazeCell { celltype: MazeCellType::WALL, visited: false };
+			let default_cell = MazeCell { celltype: MazeCellType::Wall, visited: false };
 			self.cells.resize(new_size, default_cell);
 		}
 
 		for i in 0..new_size
 		{
-			self.cells[i].celltype = MazeCellType::WALL;
+			self.cells[i].celltype = MazeCellType::Wall;
 			self.cells[i].visited = false;
 		}
 
