@@ -15,6 +15,7 @@ use std::io;
 use std::io::Write;
 
 use simple_logger::SimpleLogger;
+use log::LevelFilter;
 
 use mazetool::mazecontrol::MazeControl;
 use mazetool::cli::CommandLineInterface;
@@ -22,7 +23,7 @@ use mazetool::cli::CommandLineInterface;
 /// Main, the entry poin for the application.
 fn main()
 {
-	SimpleLogger::new().init().unwrap_or_else(|_| ::std::process::exit(1));
+	SimpleLogger::new().with_level(LevelFilter::Off).init().unwrap_or_else(|_| ::std::process::exit(1));
 
 	let mut control : MazeControl<CommandLineInterface> = MazeControl::new();
 

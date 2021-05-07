@@ -5,13 +5,16 @@
 
 use std::sync::mpsc;
 use std::marker::PhantomData;
-use std::sync::{ Arc, Mutex };
+use std::sync::{ Arc, Mutex, MutexGuard };
+use std::result::Result;
 
-use rand::prelude::*;
+//use rand::prelude::*;
+//use rand::{ thread_rng, Rng };
+use rand::seq::SliceRandom;
 
 use mazetool::userinterface::UserInterface;
-use mazetool::common::{ UIRequest, Job };
-use mazetool::maze::{ Dimensions, Maze, MazeCellType };
+use mazetool::common::{ UIRequest, Job, AppError };
+use mazetool::maze::{ Direction, Dimensions, Maze };
 
 /// A class for main logic (controller) of the food consumption database application.
 ///
@@ -69,7 +72,11 @@ where T: UserInterface
 						Job::GenerateMaze(dimensions) => {
 							to_ui_tx.send(UIRequest::ShowInfo("Generating...".to_string()))
 								.unwrap_or_else(|_| return);
-							self.generate_maze(dimensions);
+							match self.generate_maze(dimensions)
+							{
+								Ok(_) => info!("Maze generated successfully"),
+								Err(e) => self.show_error(format!("Error generating maze: {}", e))
+							};
 						},
 						Job::SolveMaze => {
 							self.solve_maze();
@@ -102,7 +109,19 @@ where T: UserInterface
 		}
 	}
 
-	fn generate_maze(&mut self, dimensions: Dimensions)
+	/// Generate a new maze of the given size
+	///
+	/// 1. Close all cells
+	/// 2. Choose starting cell and open it. This is the current cell
+	/// 3. Pick a cell adjacent to the current cell that hasn’t been visited and open it. It becomes the current cell
+	/// 4. Repeat 2 until no adjacent wall can be selected
+	/// 5. The previous cell becomes the current cell. If this cell is the starting cell, then we are done. Else go to 2
+	///
+	/// # Arguments
+	///
+	/// * `dimensions`  - The dimensions of a new maze to generate
+	///
+	fn generate_maze(&mut self, dimensions: Dimensions) -> Result<(), AppError>
 	{
 		info!("Request to generate a maze received");
 
@@ -111,18 +130,9 @@ where T: UserInterface
 			Ok(mut m) => {
 				m.reset(dimensions);
 
-				//TODO: implementation to generate a maze
-				for i in 0..m.dimensions.height
-				{
-					for j in 0..m.dimensions.width
-					{
-						if m.cells[j + (i * m.dimensions.width)].celltype == MazeCellType::Start
-						{
-							debug!("lol, start found - continue from here");
-						}
-					}
-				}
+				let position = m.get_start_position()?;
 
+				self.dig(&mut m, position)?;
 			},
 			Err(e) => {
 				self.show_error(e.to_string());
@@ -134,6 +144,42 @@ where T: UserInterface
 			channel.send(UIRequest::ShowMaze(self.maze.clone())).unwrap_or_else(|_| return);
 			channel.send(UIRequest::Quit).unwrap_or_else(|_| return);
 		}
+		Ok(())
+	}
+
+	fn dig(&self, maze: &mut MutexGuard<Maze>, position: usize) -> Result<(), AppError>
+	{
+		debug!("Checking if digging possible at position {}", position);
+
+		// generate ranndom order of directions to try for this cell
+		let mut rng = rand::thread_rng();
+		let mut directions = Direction::get_directions();
+		directions.shuffle(&mut rng);
+
+		for direction in directions.iter()
+		{
+			match maze.is_diggable(position, *direction)
+			{
+				Ok(result) => {
+					if result == true
+					{
+						debug!("Digging new passage towards {}", direction);
+						let new_position = maze.dig_passage(position, *direction)?;
+						debug!("Moving to new position {}", new_position);
+						self.dig(maze, new_position)?; // recurse into digging the next position
+					}
+					else
+					{
+						debug!("Can't dig to {}", direction);
+					}
+				},
+				Err(e) => {
+					debug!("Can't dig to {}, error: {}", direction, e.to_string());
+				}
+			}
+		}
+		debug!("Stepping back from {}", position);
+		Ok(())
 	}
 
 	/// Solve an already generated maze
