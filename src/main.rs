@@ -7,6 +7,7 @@
 extern crate log;
 extern crate simple_logger;
 extern crate getopts;
+extern crate rand;
 
 mod mazetool;
 

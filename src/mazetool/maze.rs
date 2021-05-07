@@ -1,5 +1,7 @@
 use std::fmt::{ Display, Formatter };
 
+use rand::prelude::*;
+
 pub const MAZE_DIMENSION_MIN : usize = 10;
 pub const MAZE_DIMENSION_MAX : usize = 10000;
 pub const MAZE_DIMENSION_DEFAULT : usize = 20;
@@ -13,7 +15,7 @@ pub struct Dimensions
 }
 
 /// Posibble states of one cell in a maze
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum MazeCellType
 {
 	Wall,
@@ -101,9 +103,22 @@ impl Maze
 			self.cells[i].visited = false;
 		}
 
+		self.randomize_start_and_end_positions();
+
 		debug!("Maze reset to new size: {} x {}, cells len: {}",
 			   self.dimensions.width,
 			   self.dimensions.height,
 			   self.cells.len());
+	}
+
+	fn randomize_start_and_end_positions(&mut self)
+	{
+		let mut rng = rand::thread_rng();
+		let start_pos: usize = rng.gen_range(0..self.dimensions.width);
+		let end_pos: usize = rng.gen_range(0..self.dimensions.width) +
+		                     (self.dimensions.width * (self.dimensions.height - 1));
+
+		self.cells[start_pos].celltype = MazeCellType::Start;
+		self.cells[end_pos].celltype = MazeCellType::End;
 	}
 }

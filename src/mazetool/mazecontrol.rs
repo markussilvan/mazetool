@@ -7,9 +7,11 @@ use std::sync::mpsc;
 use std::marker::PhantomData;
 use std::sync::{ Arc, Mutex };
 
+use rand::prelude::*;
+
 use mazetool::userinterface::UserInterface;
 use mazetool::common::{ UIRequest, Job };
-use mazetool::maze::{ Dimensions, Maze };
+use mazetool::maze::{ Dimensions, Maze, MazeCellType };
 
 /// A class for main logic (controller) of the food consumption database application.
 ///
@@ -94,13 +96,24 @@ where T: UserInterface
 		{
 			Ok(mut m) => {
 				m.reset(dimensions);
+
+				//TODO: implementation to generate a maze
+				for i in 0..m.dimensions.height
+				{
+					for j in 0..m.dimensions.width
+					{
+						if m.cells[j + (i * m.dimensions.width)].celltype == MazeCellType::Start
+						{
+							debug!("lol, start found - continue from here");
+						}
+					}
+				}
+
 			},
 			Err(e) => {
 				self.show_error(e.to_string());
 			},
 		}
-
-		//TODO: implementation to generate a maze
 
 		if let Some(ref channel) = self.to_ui_tx
 		{

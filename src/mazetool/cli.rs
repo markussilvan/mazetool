@@ -65,7 +65,7 @@ impl CommandLineInterface
 				{
 					for j in 0..m.dimensions.width
 					{
-						print!("{}", m.cells[i*j].celltype);
+						print!("{}", m.cells[j + (i * m.dimensions.width)].celltype);
 					}
 					println!("");
 				}
