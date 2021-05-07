@@ -27,6 +27,7 @@ pub struct MazeControl<T: UserInterface>
 impl<T> MazeControl<T>
 where T: UserInterface
 {
+	/// Creates a new MazeControl instance.
 	pub fn new() -> Self
 	{
 		let mc = MazeControl
@@ -38,6 +39,13 @@ where T: UserInterface
 		return mc;
 	}
 
+	/// Run the control
+	///
+	/// Initializes and runs the UI (which must create its own thread).
+	/// Continues to run the control message loop in the main thread.
+	///
+	/// Communicates with the UI using channels.
+	///
 	pub fn run(&mut self)
 	{
 		let (from_ui_tx, from_ui_rx) = mpsc::channel();
@@ -77,6 +85,12 @@ where T: UserInterface
 		handle.join().unwrap_or_else(|_| return);
 	}
 
+	/// Send a job to the UI to show an error message
+	///
+	/// # Arguments
+	///
+	/// * `message`     - The error string
+	///
 	fn show_error(&self, message: String)
 	{
 		match self.to_ui_tx

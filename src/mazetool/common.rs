@@ -29,23 +29,23 @@ pub enum UIRequest
 
 /// Type of errors returned by different components in the application
 #[derive(Debug)]
-pub struct ApplicationError
+pub struct AppError
 {
 	details: String
 }
 
-impl ApplicationError
+impl AppError
 {
-	pub fn new(msg: &str) -> ApplicationError
+	pub fn new(msg: &str) -> AppError
 	{
-		ApplicationError
+		AppError
 		{
 			details: msg.to_string()
 		}
 	}
 }
 
-impl fmt::Display for ApplicationError
+impl fmt::Display for AppError
 {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result
 	{
@@ -53,7 +53,7 @@ impl fmt::Display for ApplicationError
 	}
 }
 
-impl Error for ApplicationError
+impl Error for AppError
 {
 	fn description(&self) -> &str
 	{
@@ -61,11 +61,11 @@ impl Error for ApplicationError
 	}
 }
 
-impl From<IOError> for ApplicationError
+impl From<IOError> for AppError
 {
-	fn from(err: IOError) -> ApplicationError
+	fn from(err: IOError) -> AppError
 	{
-		ApplicationError::new(&err.to_string())
+		AppError::new(&err.to_string())
 	}
 }
 
