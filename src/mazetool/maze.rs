@@ -164,8 +164,6 @@ impl Maze
 			self.cells[i].visited = false;
 		}
 
-		self.randomize_start_and_end_positions();
-
 		debug!("Maze reset to new size: {} x {}, cells len: {}",
 			   self.dimensions.width,
 			   self.dimensions.height,
@@ -177,9 +175,10 @@ impl Maze
 	                   direction: Direction
 	) -> Result<bool, AppError>
 	{
-		let new_position: usize = self.get_neighboring_position(position, direction)?;
+		let intermediate_position: usize = self.get_neighboring_position(position, direction)?;
+		let new_position: usize = self.get_neighboring_position(intermediate_position, direction)?;
 
-		// check the actual position is diggable
+		// check the actual position is diggable (if it is, then also the intermediate is
 		if !self.is_wall_or_end_position(new_position)
 		{
 			return Ok(false);
@@ -199,53 +198,23 @@ impl Maze
 			return Err(AppError::new("Error while handling directions"));
 		}
 
-		let mut doable = false;
-
-		for test_direction in directions.iter()
+		// check "sides" or "corners" of the new position and the test_position is also "diggable"
+		if self.are_sides_diggable(new_position, direction)
 		{
-			let test_position = self.get_neighboring_position(new_position, *test_direction)?;
-
-			if !self.is_wall_or_end_position(test_position)
+			for test_direction in directions.iter()
 			{
-				debug!("Neighboring position {} is not a Wall or the End", test_position);
-				return Ok(false);
-			}
-			else
-			{
-				// check "sides" or "corners" of the test_position are also "diggable"
-				let mut sides: [usize; 2] = [0, 0];
-				if *test_direction == Direction::North || *test_direction == Direction::South
-				{
-					if let Ok(pos) = self.get_neighboring_position(test_position, Direction::East)
-					{
-						sides[0] = pos;
-					}
-					if let Ok(pos) = self.get_neighboring_position(test_position, Direction::West)
-					{
-						sides[1] = pos;
-					}
-				}
-				else
-				{
-					if let Ok(pos) = self.get_neighboring_position(test_position, Direction::North)
-					{
-						sides[0] = pos;
-					}
-					if let Ok(pos) = self.get_neighboring_position(test_position, Direction::South)
-					{
-						sides[1] = pos;
-					}
-				}
+				let test_position = self.get_neighboring_position(new_position, *test_direction)?;
 
-				if self.is_wall_or_end_position(sides[0]) &&
-				   self.is_wall_or_end_position(sides[1])
+				if !self.is_wall_or_end_position(test_position)
 				{
-					doable = true;
+					debug!("Neighboring position {} is not a Wall or the End", test_position);
+					return Ok(false);
 				}
 			}
+			return Ok(true);
 		}
 
-		return Ok(doable);
+		return Ok(false);
 	}
 
 	pub fn dig_passage(&mut self,
@@ -253,32 +222,27 @@ impl Maze
 	                   direction: Direction
 	) -> Result<usize, AppError>
 	{
-		let new_position: usize = self.get_neighboring_position(position, direction)?;
+		let intermediate_position: usize = self.get_neighboring_position(position, direction)?;
+		let new_position: usize = self.get_neighboring_position(intermediate_position, direction)?;
 
-		if self.cells[new_position].celltype != MazeCellType::Wall
+		if self.cells[intermediate_position].celltype != MazeCellType::Wall ||
+		   !self.is_wall_or_end_position(new_position)
 		{
-			return Err(AppError::new("Trying to dig something else than a Wall"));
+			let error = format!("Trying to dig something foul (positions: {}, {}) (types: {}, {})",
+			                    intermediate_position,
+			                    new_position,
+			                    self.cells[intermediate_position].celltype,
+			                    self.cells[new_position].celltype);
+			return Err(AppError::new(error.as_str()));
 		}
 
-		self.cells[new_position].celltype = MazeCellType::Passage;
+		self.cells[intermediate_position].celltype = MazeCellType::Passage;
+		if self.cells[new_position].celltype != MazeCellType::End
+		{
+			self.cells[new_position].celltype = MazeCellType::Passage;
+		}
 
 		return Ok(new_position);
-	}
-
-	pub fn get_start_position(&self) -> Result<usize, AppError>
-	{
-		for i in 0..self.dimensions.height
-		{
-			for j in 0..self.dimensions.width
-			{
-				let pos: usize = j + (i * self.dimensions.width);
-				if self.cells[pos].celltype == MazeCellType::Start
-				{
-					return Ok(pos);
-				}
-			}
-		}
-		return Err(AppError::new("Maze start position not found"));
 	}
 
 	fn is_wall_or_end_position(&mut self, position: usize) -> bool
@@ -328,12 +292,71 @@ impl Maze
 		return Err(AppError::new("Invalid maze position encountered"));
 	}
 
-	fn randomize_start_and_end_positions(&mut self)
+	fn are_sides_diggable(&mut self, position: usize, direction: Direction) -> bool
+	{
+		// check "sides" or "corners" of the test_position are also "diggable"
+		let mut sides: [usize; 2] = [0, 0];
+		let mut doable = false;
+
+		if direction == Direction::North || direction == Direction::South
+		{
+			if let Ok(pos) = self.get_neighboring_position(position, Direction::East)
+			{
+				sides[0] = pos;
+			}
+			if let Ok(pos) = self.get_neighboring_position(position, Direction::West)
+			{
+				sides[1] = pos;
+			}
+		}
+		else
+		{
+			if let Ok(pos) = self.get_neighboring_position(position, Direction::North)
+			{
+				sides[0] = pos;
+			}
+			if let Ok(pos) = self.get_neighboring_position(position, Direction::South)
+			{
+				sides[1] = pos;
+			}
+		}
+
+		if self.is_wall_or_end_position(sides[0]) &&
+		   self.is_wall_or_end_position(sides[1])
+		{
+			doable = true;
+		}
+
+		return doable;
+	}
+
+	fn randomize_position_from_row(&self, row: usize) -> usize
 	{
 		let mut rng = rand::thread_rng();
-		let start_pos: usize = rng.gen_range(0..self.dimensions.width);
-		let end_pos: usize = rng.gen_range(0..self.dimensions.width) +
-		                     (self.dimensions.width * (self.dimensions.height - 1));
+		let mut position: usize = rng.gen_range(1..self.dimensions.width - 1);
+
+		if position % 2 == 0
+		{
+			position = position - 1;
+		}
+
+		position = position + (row * self.dimensions.width);
+
+		return position;
+	}
+
+	/// Randomize the starting point for the maze generation
+	pub fn randomize_start_position(&mut self) -> usize
+	{
+		let position = self.randomize_position_from_row(1);
+		self.cells[position].celltype = MazeCellType::Passage;
+		return position;
+	}
+
+	pub fn insert_start_and_end_positions(&mut self)
+	{
+		let start_pos = self.randomize_position_from_row(0);
+		let end_pos = self.randomize_position_from_row(self.dimensions.height - 1);
 
 		self.cells[start_pos].celltype = MazeCellType::Start;
 		self.cells[end_pos].celltype = MazeCellType::End;

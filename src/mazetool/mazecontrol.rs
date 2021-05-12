@@ -111,11 +111,15 @@ where T: UserInterface
 
 	/// Generate a new maze of the given size
 	///
+	/// A simple recursive backtracking algorithm.
+	///
 	/// 1. Close all cells
 	/// 2. Choose starting cell and open it. This is the current cell
-	/// 3. Pick a cell adjacent to the current cell that hasn’t been visited and open it. It becomes the current cell
+	/// 3. Pick a cell adjacent to the current cell that hasn’t been visited and open it.
+	///    It becomes the current cell.
 	/// 4. Repeat 2 until no adjacent wall can be selected
-	/// 5. The previous cell becomes the current cell. If this cell is the starting cell, then we are done. Else go to 2
+	/// 5. The previous cell becomes the current cell.
+	///    If this cell is the starting cell, then we are done. Else go to 2.
 	///
 	/// # Arguments
 	///
@@ -130,9 +134,12 @@ where T: UserInterface
 			Ok(mut m) => {
 				m.reset(dimensions);
 
-				let position = m.get_start_position()?;
+				// generation could be started from any position, but we choose the start position
+				let position = m.randomize_start_position();
+				debug!("Start position: {}", position);
 
 				self.dig(&mut m, position)?;
+				m.insert_start_and_end_positions();
 			},
 			Err(e) => {
 				self.show_error(e.to_string());
@@ -147,6 +154,12 @@ where T: UserInterface
 		Ok(())
 	}
 
+	/// Recursively dig passages in the maze
+	///
+	/// # Arguments
+	/// * `maze`        - The maze data structure
+	/// * `position`    - Current position in the maze
+	///
 	fn dig(&self, maze: &mut MutexGuard<Maze>, position: usize) -> Result<(), AppError>
 	{
 		debug!("Checking if digging possible at position {}", position);
