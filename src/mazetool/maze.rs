@@ -8,7 +8,7 @@ use mazetool::common::AppError;
 pub const NUM_OF_DIRECTIONS: usize = 4;
 pub const MAZE_DIMENSION_MIN : usize = 10;
 pub const MAZE_DIMENSION_MAX : usize = 10000;
-pub const MAZE_DIMENSION_DEFAULT : usize = 20;
+pub const MAZE_DIMENSION_DEFAULT : usize = 19;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Direction
