@@ -245,6 +245,24 @@ impl Maze
 		return Ok(new_position);
 	}
 
+	/// Randomize the starting point for the maze generation
+	pub fn randomize_start_position(&mut self) -> usize
+	{
+		let position = self.randomize_position_from_row(1);
+		self.cells[position].celltype = MazeCellType::Passage;
+		return position;
+	}
+
+	/// Insert start and end cells to a maze
+	pub fn insert_start_and_end_positions(&mut self)
+	{
+		let start_pos = self.randomize_position_from_row(0);
+		let end_pos = self.randomize_position_from_row(self.dimensions.height - 1);
+
+		self.cells[start_pos].celltype = MazeCellType::Start;
+		self.cells[end_pos].celltype = MazeCellType::End;
+	}
+
 	fn is_wall_or_end_position(&mut self, position: usize) -> bool
 	{
 		if ![MazeCellType::Wall, MazeCellType::End].contains(&self.cells[position].celltype)
@@ -343,22 +361,5 @@ impl Maze
 		position = position + (row * self.dimensions.width);
 
 		return position;
-	}
-
-	/// Randomize the starting point for the maze generation
-	pub fn randomize_start_position(&mut self) -> usize
-	{
-		let position = self.randomize_position_from_row(1);
-		self.cells[position].celltype = MazeCellType::Passage;
-		return position;
-	}
-
-	pub fn insert_start_and_end_positions(&mut self)
-	{
-		let start_pos = self.randomize_position_from_row(0);
-		let end_pos = self.randomize_position_from_row(self.dimensions.height - 1);
-
-		self.cells[start_pos].celltype = MazeCellType::Start;
-		self.cells[end_pos].celltype = MazeCellType::End;
 	}
 }
