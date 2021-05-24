@@ -12,18 +12,23 @@ the most efficient design.
 Source is available in git, `nitro.dy.fi:/data/git/playground.git`.
 Install CMake, Rust and Cargo.
 
+To use rust-analyzer in Vim, rust-src must also be installed and
+path to it available. It may be an issue with older versions, but
+do `export RUST_SRC_PATH="$(rustc --print sysroot)/lib/rustlib/src/src"`
+if needed.
+
 ## Build
 
 Building is as simple as running `cargo build` anywhere in the source tree.
 
 ## Running
 
-Just do `cargo run -- generate 100 40`.
-For some reason this uses a lot of stack space, more then expected for this
+Just do `cargo run -- generate 99 39`.
+This uses a lot of stack space, maybe even more then expected for this
 level of recursion.
 
 `RUSTFLAGS="-C link-args=-zstack-size=16000000" cargo run -- generate 100 300 >foo`
-can be used to increase the stack size.
+can be used to run the maze generation with an increase the stack size.
 
 ## Testing
 
