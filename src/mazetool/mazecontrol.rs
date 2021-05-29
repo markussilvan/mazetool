@@ -136,6 +136,8 @@ impl MazeControl
 
 				self.dig(&mut m, position)?;
 				m.insert_start_and_end_positions();
+				m.write_to_file("saved.maze")?;
+				m.read_from_file("saved.maze")?; //TODO: these are here temporarily, do these some other way
 			},
 			Err(e) => {
 				self.show_error(e.to_string());
@@ -143,7 +145,6 @@ impl MazeControl
 		}
 
 		self.tx.send(UIRequest::ShowMaze(self.maze.clone())).unwrap_or_else(|_| return);
-		self.tx.send(UIRequest::SaveMaze(self.maze.clone())).unwrap_or_else(|_| return);
 		self.tx.send(UIRequest::Quit).unwrap_or_else(|_| return);
 		Ok(())
 	}

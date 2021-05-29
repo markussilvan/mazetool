@@ -2,7 +2,9 @@ use std::fmt::{ Display, Formatter };
 use std::result::Result;
 use std::fs::File;
 use std::io::prelude::*;
+use std::io::{self, BufRead};
 use std::path::Path;
+use std::str::FromStr;
 
 use rand::prelude::*;
 
@@ -102,6 +104,24 @@ impl Display for MazeCellType
     }
 }
 
+impl FromStr for MazeCellType
+{
+	type Err = AppError;
+	fn from_str(hex_code: &str) -> Result<Self, Self::Err> {
+		//TODO: proper implementation for MazeCellType
+        let celltype: u8 = u8::from_str_radix(&hex_code[0..1], 16)?;
+        Ok(MazeCellType::Wall)
+
+        // u8::from_str_radix(src: &str, radix: u32) converts a string
+        // slice in a given base to u8
+        //let r: u8 = u8::from_str_radix(&hex_code[1..3], 16)?;
+        //let g: u8 = u8::from_str_radix(&hex_code[3..5], 16)?;
+        //let b: u8 = u8::from_str_radix(&hex_code[5..7], 16)?;
+
+        //Ok(RGB { r, g, b })
+    }
+}
+
 /// One cell of a maze
 #[derive(Debug, Clone)]
 pub struct MazeCell
@@ -149,6 +169,90 @@ impl Maze
 		};
 
 		return maze;
+	}
+
+	fn parse_header_line(&self, header: &String) -> Result<Dimensions, AppError>
+	{
+		let mut dimensions = Dimensions { width: 0, height: 0 };
+		let mut offset: usize = 0;
+		let radix = 10;
+
+		// parse "Maze" text
+		if header[offset..5] == *"Maze "
+		{
+			offset += 5;
+		}
+		else
+		{
+			return Err(AppError::new("Error reading maze file header"));
+		}
+
+		// parse width
+		match header[offset..].chars().position(|c| c == ' ')
+		{
+			Some(n) => {
+				dimensions.width = usize::from_str_radix(&header[offset..offset+n], radix)?;
+				offset += n + 1;
+				debug!("Parsed width {}", dimensions.width);
+			},
+			None => return Err(AppError::new("Error parsing maze width from file header")),
+		}
+
+		// parse height
+		dimensions.height = usize::from_str_radix(&header[offset..], radix)?;
+		debug!("Parsed height {}", dimensions.height);
+
+		Ok(dimensions)
+	}
+
+	/// Read a maze from a file
+	///
+	/// Maze is read from a file to this instance of Maze, and
+	/// will overwrite any data already in this Maze.
+	///
+	/// # Parameters
+	///
+	/// * `filename`        - Source filename for loading the maze
+	///
+	/// Returns AppError on failure.
+	///
+	pub fn read_from_file(&self, filename: &str) -> Result<(), AppError>
+	{
+		let path = Path::new(filename);
+		let display = path.display();
+		let file = match File::open(&path)
+		{
+			Err(e) => {
+				let error = format!("Couldn't open maze file {}: {}", display, e);
+				return Err(AppError::new(&error));
+			},
+			Ok(file) => file,
+		};
+		let mut lines = io::BufReader::new(file).lines();   // io::Lines<io::BufReader<File>>
+
+		println!("Maze read from file");
+		if let Some(Ok(header)) = lines.next()
+		{
+			self.parse_header_line(&header)?;
+		}
+
+		//TODO: parse the data instead of just printing it
+		for line in lines
+		{
+			if let Ok(l) = line
+			{
+				for c in l.chars()
+				{
+					//MazeCellType::from_str(&l[..1]);
+					//let foo = MazeCellType::from_str(c);
+					//TODO: from_str()
+					print!("{}", c);
+				}
+
+				println!("");
+			}
+		}
+		Ok(())
 	}
 
 	/// Save an already generated maze to a file

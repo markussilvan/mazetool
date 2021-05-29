@@ -1,8 +1,9 @@
 // Common types and utilities for Mazetool
 
-use std::io::Error as IOError;
 use std::fmt;
 use std::error::Error;
+use std::io::Error as IOError;
+use std::num::ParseIntError;
 use std::sync::{ Arc, Mutex };
 
 use super::maze::{ Dimensions, Maze };
@@ -23,7 +24,6 @@ pub enum UIRequest
 	ShowError(String),
 	ShowInfo(String),
 	ShowMaze(Arc<Mutex<Maze>>),
-	SaveMaze(Arc<Mutex<Maze>>),
 	Quit,
 }
 
@@ -64,6 +64,14 @@ impl Error for AppError
 impl From<IOError> for AppError
 {
 	fn from(err: IOError) -> AppError
+	{
+		AppError::new(&err.to_string())
+	}
+}
+
+impl From<ParseIntError> for AppError
+{
+	fn from(err: ParseIntError) -> AppError
 	{
 		AppError::new(&err.to_string())
 	}
