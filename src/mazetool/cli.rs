@@ -6,7 +6,6 @@ use std::sync::{ Arc, Mutex };
 use std::thread;
 
 use mazetool::userinterface::UserInterface;
-//use mazetool::common::ApplicationError;
 use mazetool::common::{ UIRequest, Job };
 use mazetool::maze::{ Dimensions, Maze, MAZE_DIMENSION_MIN, MAZE_DIMENSION_MAX, MAZE_DIMENSION_DEFAULT };
 
