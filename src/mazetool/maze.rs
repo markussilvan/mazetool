@@ -1,5 +1,8 @@
 use std::fmt::{ Display, Formatter };
 use std::result::Result;
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::Path;
 
 use rand::prelude::*;
 
@@ -133,6 +136,7 @@ impl std::fmt::Debug for Maze
 
 impl Maze
 {
+	/// Create a new maze structure
 	pub fn new() -> Maze
 	{
 		let default_cell = MazeCell { celltype: MazeCellType::Wall, visited: false };
@@ -147,6 +151,61 @@ impl Maze
 		return maze;
 	}
 
+	/// Save an already generated maze to a file
+	///
+	/// # Parameters
+	/// 
+	/// * `filename`        - Target filename for saving the maze
+	///
+	/// Returns AppError on failure.
+	///
+	pub fn write_to_file(&self, filename: &str) -> Result<(), AppError>
+	{
+		let path = Path::new(filename);
+		let display = path.display();
+
+		let mut file = match File::create(&path)
+		{
+			Err(e) => {
+				let error = format!("Couldn't create maze file {}: {}", display, e);
+				return Err(AppError::new(&error));
+			},
+			Ok(file) => file,
+		};
+
+		match writeln!(file, "Maze {} {}", self.dimensions.width, self.dimensions.height)
+		{
+			Err(e) => return Err(AppError::new(format!("Error writing maze: {}", e).as_str())),
+			Ok(_) => {}
+		}
+
+		for i in 0..self.dimensions.height
+		{
+			for j in 0..self.dimensions.width
+			{
+				match write!(file, "{}", self.cells[j + (i * self.dimensions.width)].celltype)
+				{
+					Err(e) => return Err(AppError::new(format!("Error writing maze: {}", e).as_str())),
+					Ok(_) => {}
+				}
+			}
+			match writeln!(file, "")
+			{
+				Err(e) => return Err(AppError::new(format!("Error writing maze: {}", e).as_str())),
+				Ok(_) => {}
+			}
+		}
+
+		return Ok(())
+	}
+
+	/// Reset a maze by clearing it content and resize it
+	/// to new dimensions if needed.
+	///
+	/// # Parameters
+	///
+	/// * `dimensions`      - New dimensions to set for the maze
+	///
 	pub fn reset(&mut self, dimensions: Dimensions)
 	{
 		let new_size = dimensions.width * dimensions.height;
@@ -171,6 +230,16 @@ impl Maze
 			   self.cells.len());
 	}
 
+	/// Test if the given position in the Maze is diggable or not
+	/// to the given direction.
+	///
+	/// # Parameters
+	///
+	/// * `position`        - Position from the maze to test
+	/// * `direction`       - Direction of digging to test
+	///
+	/// Returns a boolean value.
+	///
 	pub fn is_diggable(&mut self,
 	                   position: usize,
 	                   direction: Direction
@@ -218,6 +287,16 @@ impl Maze
 		return Ok(false);
 	}
 
+	/// Dig a new passage to the maze.
+	///
+	/// # Parameters
+	///
+	/// * `position`        - Starting position for the digging
+	/// * `direction`       - Direction of digging
+	///
+	/// Returns the new position where the digging ended.
+	/// That is two cells towards the given direction from the stating position.
+	///
 	pub fn dig_passage(&mut self,
 	                   position: usize,
 	                   direction: Direction
@@ -246,7 +325,9 @@ impl Maze
 		return Ok(new_position);
 	}
 
-	/// Randomize the starting point for the maze generation
+	/// Randomize the starting point for the maze generation.
+	///
+	/// Returns the randomized starting position.
 	pub fn randomize_start_position(&mut self) -> usize
 	{
 		let position = self.randomize_position_from_row(1);

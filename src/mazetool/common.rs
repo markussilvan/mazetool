@@ -23,6 +23,7 @@ pub enum UIRequest
 	ShowError(String),
 	ShowInfo(String),
 	ShowMaze(Arc<Mutex<Maze>>),
+	SaveMaze(Arc<Mutex<Maze>>),
 	Quit,
 }
 

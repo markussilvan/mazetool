@@ -65,6 +65,23 @@ impl CommandLineInterface
 		}
 	}
 
+	fn save_maze(&self, maze: Arc<Mutex<Maze>>)
+	{
+		match maze.lock()
+		{
+			Ok(m) => {
+				match m.write_to_file("saved.maze")
+				{
+					Ok(_) => {},
+					Err(e) => self.show_error(&e.to_string()),
+				}
+			},
+			Err(e) => {
+				self.show_error(&e.to_string());
+			},
+		}
+	}
+
 	/// Handle a single request from the controller
 	///
 	/// # Parameters
@@ -91,6 +108,9 @@ impl CommandLineInterface
 			},
 			UIRequest::ShowMaze(maze) => {
 				self.show_maze(maze);
+			},
+			UIRequest::SaveMaze(maze) => {
+				self.save_maze(maze);
 			},
 			UIRequest::Quit => {
 				keep_running = false;

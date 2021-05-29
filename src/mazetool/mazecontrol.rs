@@ -96,7 +96,7 @@ impl MazeControl
 
 	/// Send a job to the UI to show an error message
 	///
-	/// # Arguments
+	/// # Parameters
 	///
 	/// * `message`     - The error string
 	///
@@ -117,7 +117,7 @@ impl MazeControl
 	/// 5. The previous cell becomes the current cell.
 	///    If this cell is the starting cell, then we are done. Else go to 2.
 	///
-	/// # Arguments
+	/// # Parameters
 	///
 	/// * `dimensions`  - The dimensions of a new maze to generate
 	///
@@ -143,13 +143,14 @@ impl MazeControl
 		}
 
 		self.tx.send(UIRequest::ShowMaze(self.maze.clone())).unwrap_or_else(|_| return);
-		self.quit();
+		self.tx.send(UIRequest::SaveMaze(self.maze.clone())).unwrap_or_else(|_| return);
+		self.tx.send(UIRequest::Quit).unwrap_or_else(|_| return);
 		Ok(())
 	}
 
 	/// Recursively dig passages in the maze
 	///
-	/// # Arguments
+	/// # Parameters
 	/// * `maze`        - The maze data structure
 	/// * `position`    - Current position in the maze
 	///
