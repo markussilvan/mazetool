@@ -16,9 +16,8 @@ use mazetool::userinterface::UserInterface;
 use mazetool::common::{ UIRequest, Job, AppError };
 use mazetool::maze::{ Direction, Dimensions, Maze };
 
-/// A class for main logic (controller) of the food consumption database application.
+/// A class for main logic (controller)
 ///
-/// Accesses database through FoodieDatabase.
 /// Interact with user through a UserInterface implementation.
 pub struct MazeControl<T: UserInterface>
 {
@@ -62,7 +61,8 @@ where T: UserInterface
 		debug!("Main thread continues");
 
 		to_ui_tx.send(UIRequest::ParseArgs).unwrap_or_else(|_| return);
-		loop {
+		loop
+		{
 			match from_ui_rx.recv().unwrap_or_else(|_| Job::Quit)
 			{
 				job => {
