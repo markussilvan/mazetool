@@ -3,7 +3,6 @@
 use std::env;
 use std::sync::mpsc::*;
 use std::sync::{ Arc, Mutex };
-use std::thread;
 
 use mazetool::userinterface::UserInterface;
 use mazetool::common::{ UIRequest, Job };
@@ -12,6 +11,8 @@ use mazetool::maze::{ Dimensions, Maze, MAZE_DIMENSION_MIN, MAZE_DIMENSION_MAX, 
 /// Command line user interface for Mazetool
 pub struct CommandLineInterface
 {
+	tx: Sender<Job>,
+	rx: Receiver<UIRequest>
 }
 
 impl CommandLineInterface
@@ -86,15 +87,15 @@ impl CommandLineInterface
 	///
 	/// * `bool`    - True, if UI thread should keep running
 	///
-	fn handle_request(&self, tx: &Sender<Job>, rx: &Receiver<UIRequest>) -> bool
+	fn handle_request(&self) -> bool
 	{
 		let mut keep_running = true;
-		let request = rx.recv().unwrap_or_else(|_| UIRequest::Quit);
+		let request = self.rx.recv().unwrap_or_else(|_| UIRequest::Quit);
 		info!("UI received request: {:?}", request);
 		match request
 		{
 			UIRequest::ParseArgs => {
-				keep_running = self.parse_args(tx);
+				keep_running = self.parse_args(&self.tx);
 			},
 			UIRequest::ShowError(message) => {
 				self.show_error(&message);
@@ -112,7 +113,7 @@ impl CommandLineInterface
 
 		if keep_running == false
 		{
-			info!("UI thread exiting");
+			info!("UI message loop exiting");
 		}
 
 		return keep_running;
@@ -144,10 +145,12 @@ impl CommandLineInterface
 impl UserInterface for CommandLineInterface
 {
 	/// Create new command line user interface instance
-	fn new() -> Self
+	fn new(tx: Sender<Job>, rx: Receiver<UIRequest>) -> Self
 	{
 		CommandLineInterface
 		{
+			tx: tx,
+			rx: rx,
 		}
 	}
 
@@ -218,23 +221,14 @@ impl UserInterface for CommandLineInterface
 		return true;
 	}
 
-	fn run(tx: Sender<Job>, rx: Receiver<UIRequest>) -> thread::JoinHandle<()>
+	fn run(&self)
 	{
-		//let handle = thread::spawn(move || {
-		let builder = thread::Builder::new().name("UserInterface".to_string());
-		let handle: thread::JoinHandle<_> = builder.spawn(move || {
-			info!("UI thread starting...");
-			let cli = CommandLineInterface::new();
-
-			loop
+		loop
+		{
+			if self.handle_request() != true
 			{
-				if cli.handle_request(&tx, &rx) != true
-				{
-					break;
-				}
+				break;
 			}
-		}).unwrap();
-
-		return handle;
+		}
 	}
 }

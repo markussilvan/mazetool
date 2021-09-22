@@ -4,39 +4,36 @@
 //! Supports different user interface implementations.
 
 use std::sync::mpsc;
-use std::marker::PhantomData;
+use std::sync::mpsc::*;
 use std::sync::{ Arc, Mutex, MutexGuard };
+use std::thread;
 use std::result::Result;
 
-//use rand::prelude::*;
-//use rand::{ thread_rng, Rng };
 use rand::seq::SliceRandom;
 
-use mazetool::userinterface::UserInterface;
 use mazetool::common::{ UIRequest, Job, AppError };
 use mazetool::maze::{ Direction, Dimensions, Maze };
 
 /// A class for main logic (controller)
 ///
 /// Interact with user through a UserInterface implementation.
-pub struct MazeControl<T: UserInterface>
+pub struct MazeControl
 {
-	ui_type: PhantomData<T>,
-	to_ui_tx: Option<mpsc::Sender<UIRequest>>,
+	tx: mpsc::Sender<UIRequest>,
 	maze: Arc<Mutex<Maze>>,
+	running: bool,
 }
 
-impl<T> MazeControl<T>
-where T: UserInterface
+impl MazeControl
 {
 	/// Creates a new MazeControl instance.
-	pub fn new() -> Self
+	pub fn new(tx : Sender<UIRequest>) -> Self
 	{
 		let mc = MazeControl
 		{
-			ui_type: PhantomData,
-			to_ui_tx: None,
+			tx: tx,
 			maze: Arc::new(Mutex::new(Maze::new())),
+			running: false,
 		};
 		return mc;
 	}
@@ -48,29 +45,38 @@ where T: UserInterface
 	///
 	/// Communicates with the UI using channels.
 	///
-	pub fn run(&mut self)
+	pub fn run(rx: Receiver<Job>, tx : Sender<UIRequest>) -> thread::JoinHandle<()>
 	{
-		let (from_ui_tx, from_ui_rx) = mpsc::channel();
-		let (to_ui_tx, to_ui_rx) = mpsc::channel();
-		self.to_ui_tx = Some(to_ui_tx.clone());
+		let thread_tx = tx.clone();
 
-		debug!("Starting user interface");
+		let builder = thread::Builder::new().name("Control".to_string());
+		let handle: thread::JoinHandle<_> = builder.spawn(move || {
+			let mut mc = MazeControl::new(thread_tx);
+			info!("Starting control thread");
+			mc.tx.send(UIRequest::ParseArgs).unwrap_or_else(|_| return);
+			mc.run_message_loop(&rx);
+			info!("Exiting control thread");
+		}).unwrap();
 
-		let handle = <T>::run(from_ui_tx, to_ui_rx);
+		info!("Main thread continues");
 
-		debug!("Main thread continues");
+		return handle
+	}
 
-		to_ui_tx.send(UIRequest::ParseArgs).unwrap_or_else(|_| return);
-		loop
+	fn run_message_loop(&mut self, rx: &Receiver<Job>)
+	{
+		self.running = true;
+
+		while self.running
 		{
-			match from_ui_rx.recv().unwrap_or_else(|_| Job::Quit)
+			match rx.recv().unwrap_or_else(|_| Job::Quit)
 			{
 				job => {
-					debug!("Main: Received job: {:?}", job);
+					info!("Control: Received job: {:?}", job);
 					match job
 					{
 						Job::GenerateMaze(dimensions) => {
-							to_ui_tx.send(UIRequest::ShowInfo("Generating...".to_string()))
+							self.tx.send(UIRequest::ShowInfo("Generating...".to_string()))
 								.unwrap_or_else(|_| return);
 							match self.generate_maze(dimensions)
 							{
@@ -88,8 +94,6 @@ where T: UserInterface
 				},
 			};
 		}
-		debug!("Main thread waiting for children to join");
-		handle.join().unwrap_or_else(|_| return);
 	}
 
 	/// Send a job to the UI to show an error message
@@ -100,13 +104,7 @@ where T: UserInterface
 	///
 	fn show_error(&self, message: String)
 	{
-		match self.to_ui_tx
-		{
-			Some(ref channel) => {
-				channel.send(UIRequest::ShowError(message)).unwrap();
-			},
-			None => {},
-		}
+		self.tx.send(UIRequest::ShowError(message)).unwrap();
 	}
 
 	/// Generate a new maze of the given size
@@ -146,11 +144,8 @@ where T: UserInterface
 			},
 		}
 
-		if let Some(ref channel) = self.to_ui_tx
-		{
-			channel.send(UIRequest::ShowMaze(self.maze.clone())).unwrap_or_else(|_| return);
-			channel.send(UIRequest::Quit).unwrap_or_else(|_| return);
-		}
+		self.tx.send(UIRequest::ShowMaze(self.maze.clone())).unwrap_or_else(|_| return);
+		self.quit();
 		Ok(())
 	}
 
@@ -198,12 +193,15 @@ where T: UserInterface
 	/// Solve an already generated maze
 	///
 	/// Find a path through the maze
-	fn solve_maze(&self)
+	fn solve_maze(&mut self)
 	{
 		self.show_error("Solving a maze is not yet implemented".to_string());
-		if let Some(ref channel) = self.to_ui_tx
-		{
-			channel.send(UIRequest::Quit).unwrap_or_else(|_| return);
-		}
+		self.quit();
+	}
+
+	fn quit(&mut self)
+	{
+		self.tx.send(UIRequest::Quit).unwrap_or_else(|_| return);
+		self.running = false;
 	}
 }
