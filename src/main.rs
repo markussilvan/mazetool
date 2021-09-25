@@ -5,22 +5,21 @@
 
 #[macro_use]
 extern crate log;
-extern crate simple_logger;
-extern crate getopts;
-extern crate rand;
 
 mod mazetool;
 
 use std::io;
 use std::io::Write;
-use std::sync::mpsc;
+//use std::sync::mpsc;
 
+use crossbeam::channel::unbounded;
 use simple_logger::SimpleLogger;
 use log::LevelFilter;
 
 use mazetool::mazecontrol::MazeControl;
 use mazetool::userinterface::UserInterface;
 use mazetool::cli::CommandLineInterface;
+use mazetool::gui::GraphicalInterface;
 
 /// Main, the entry poin for the application.
 fn main()
@@ -33,8 +32,9 @@ fn main()
 	// from_ui_rx - receive from ui to control
 	// to_ui_tx   - send to ui from control
 	// to_ui_rx   - receive from ui to control
-	let (from_ui_tx, from_ui_rx) = mpsc::channel();
-	let (to_ui_tx, to_ui_rx) = mpsc::channel();
+	let (from_ui_tx, from_ui_rx) = unbounded();
+	let (to_ui_tx, to_ui_rx) = unbounded();
+	let use_gui = true;
 
 	info!("Creating control");
 
@@ -42,9 +42,16 @@ fn main()
 
 	info!("Creating user interface");
 
-	let ui : CommandLineInterface = CommandLineInterface::new(from_ui_tx, to_ui_rx);
-
-	ui.run();
+	if use_gui
+	{
+		let mut ui = GraphicalInterface::new(from_ui_tx, to_ui_rx);
+		ui.run();
+	}
+	else
+	{
+		let mut ui = CommandLineInterface::new(from_ui_tx, to_ui_rx);
+		ui.run();
+	};
 
 	info!("Main (UI) thread waiting for children to join");
 	control_handle.join().unwrap_or_else(|_| return);

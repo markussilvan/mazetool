@@ -3,23 +3,22 @@
 //! Implements the application logic.
 //! Supports different user interface implementations.
 
-use std::sync::mpsc;
-use std::sync::mpsc::*;
 use std::sync::{ Arc, Mutex, MutexGuard };
 use std::thread;
 use std::result::Result;
 
+use crossbeam::channel::{Receiver, Sender};
 use rand::seq::SliceRandom;
 
-use mazetool::common::{ UIRequest, Job, AppError };
-use mazetool::maze::{ Direction, Dimensions, Maze };
+use super::common::{ UIRequest, Job, AppError };
+use super::maze::{ Direction, Dimensions, Maze };
 
 /// A class for main logic (controller)
 ///
 /// Interact with user through a UserInterface implementation.
 pub struct MazeControl
 {
-	tx: mpsc::Sender<UIRequest>,
+	tx: Sender<UIRequest>,
 	maze: Arc<Mutex<Maze>>,
 	running: bool,
 }

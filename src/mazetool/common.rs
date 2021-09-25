@@ -5,7 +5,7 @@ use std::fmt;
 use std::error::Error;
 use std::sync::{ Arc, Mutex };
 
-use mazetool::maze::{ Dimensions, Maze };
+use super::maze::{ Dimensions, Maze };
 
 /// Commands given by the user (interface) to the control logic
 #[derive(Debug)]

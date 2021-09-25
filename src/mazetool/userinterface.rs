@@ -1,12 +1,11 @@
-use std::sync::mpsc::Sender;
-use std::sync::mpsc::Receiver;
+use crossbeam::channel::{Receiver, Sender};
 
-use mazetool::common::{ Job, UIRequest };
+use super::common::{ Job, UIRequest };
 
 /// Trait for features required from a Mazetool user interface
 pub trait UserInterface
 {
 	fn new(tx: Sender<Job>, rx: Receiver<UIRequest>) -> Self;
 	fn parse_args(&self, tx: &Sender<Job>) -> bool;
-	fn run(&self);
+	fn run(&mut self);
 }

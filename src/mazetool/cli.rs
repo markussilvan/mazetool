@@ -1,12 +1,13 @@
 // Mazetool - command line user interface
 
 use std::env;
-use std::sync::mpsc::*;
 use std::sync::{ Arc, Mutex };
 
-use mazetool::userinterface::UserInterface;
-use mazetool::common::{ UIRequest, Job };
-use mazetool::maze::{ Dimensions, Maze, MAZE_DIMENSION_MIN, MAZE_DIMENSION_MAX, MAZE_DIMENSION_DEFAULT };
+use crossbeam::channel::{Receiver, Sender};
+
+use super::userinterface::UserInterface;
+use super::common::{ UIRequest, Job };
+use super::maze::{ Dimensions, Maze, MAZE_DIMENSION_MIN, MAZE_DIMENSION_MAX, MAZE_DIMENSION_DEFAULT };
 
 /// Command line user interface for Mazetool
 pub struct CommandLineInterface
@@ -221,7 +222,7 @@ impl UserInterface for CommandLineInterface
 		return true;
 	}
 
-	fn run(&self)
+	fn run(&mut self)
 	{
 		loop
 		{

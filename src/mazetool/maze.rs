@@ -3,7 +3,7 @@ use std::result::Result;
 
 use rand::prelude::*;
 
-use mazetool::common::AppError;
+use super::common::AppError;
 
 pub const NUM_OF_DIRECTIONS: usize = 4;
 pub const MAZE_DIMENSION_MIN : usize = 10;
@@ -116,6 +116,7 @@ impl Display for MazeCell
 }
 
 /// The maze data structure
+#[derive(Clone)]
 pub struct Maze
 {
 	pub dimensions: Dimensions,
