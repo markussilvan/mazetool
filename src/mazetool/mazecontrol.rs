@@ -52,7 +52,6 @@ impl MazeControl
 		let handle: thread::JoinHandle<_> = builder.spawn(move || {
 			let mut mc = MazeControl::new(thread_tx);
 			info!("Starting control thread");
-			mc.tx.send(UIRequest::ParseArgs).unwrap_or_else(|_| return);
 			mc.run_message_loop(&rx);
 			info!("Exiting control thread");
 		}).unwrap();

@@ -1,35 +1,23 @@
 // Mazetool - command line user interface
 
-use std::env;
 use std::sync::{ Arc, Mutex };
 
 use crossbeam::channel::{Receiver, Sender};
 
 use super::userinterface::UserInterface;
 use super::common::{ UIRequest, Job };
-use super::maze::{ Dimensions, Maze, MAZE_DIMENSION_MIN, MAZE_DIMENSION_MAX, MAZE_DIMENSION_DEFAULT };
+use super::maze::Maze;
 
 /// Command line user interface for Mazetool
 pub struct CommandLineInterface
 {
+	#[allow(dead_code)]
 	tx: Sender<Job>,
 	rx: Receiver<UIRequest>
 }
 
 impl CommandLineInterface
 {
-	/// Print help text of program's command line argument usage
-	fn print_usage(&self, program: &str)
-	{
-		println!("Usage: {} <command> [options]", program);
-		println!("Run the program in the directory containing the database.");
-		println!("");
-		println!("Commands:");
-		println!("  generate        Generate a new random maze of given size");
-		println!("  solve           Solve a given maze");
-		println!("  help            Print this help");
-	}
-
 	/// Show an info message in the user interface
 	///
 	/// # Parameters
@@ -95,9 +83,6 @@ impl CommandLineInterface
 		info!("UI received request: {:?}", request);
 		match request
 		{
-			UIRequest::ParseArgs => {
-				keep_running = self.parse_args(&self.tx);
-			},
 			UIRequest::ShowError(message) => {
 				self.show_error(&message);
 			},
@@ -119,27 +104,6 @@ impl CommandLineInterface
 
 		return keep_running;
 	}
-
-	fn parse_dimension(&self, arg: &str, out: &mut usize) -> bool
-	{
-		let mut ret = true;
-
-		match arg.parse::<usize>()
-		{
-			Ok(n) => *out = n,
-			Err(_) => {
-				self.show_error("Invalid parameters");
-				ret = false;
-			}
-		}
-
-		if *out > MAZE_DIMENSION_MAX && *out < MAZE_DIMENSION_MIN
-		{
-			ret = false;
-		}
-
-		return ret;
-	}
 }
 
 
@@ -153,73 +117,6 @@ impl UserInterface for CommandLineInterface
 			tx: tx,
 			rx: rx,
 		}
-	}
-
-	/// Parse command line arguments
-	fn parse_args(&self, tx: &Sender<Job>) -> bool
-	{
-		info!("Parsing command line arguments");
-
-		let args: Vec<String> = env::args().collect();
-		let program = &args[0];
-
-		if args.len() < 2
-		{
-			self.print_usage(program);
-			return false;
-		}
-
-		let command = &args[1];
-		match command.as_ref()
-		{
-			"generate" => {
-				info!("Generate requested");
-				let mut dimensions = Dimensions {
-					width: MAZE_DIMENSION_DEFAULT,
-					height: MAZE_DIMENSION_DEFAULT
-				};
-				if args.len() == 2
-				{
-					info!("Using default size");
-				}
-				else if args.len() == 4
-				{
-					info!("Parsing dimensions from command line parameteres");
-					if !self.parse_dimension(&args[2], &mut dimensions.width)
-					{
-						info!("Parsing maze width failed");
-						return false;
-					}
-					if !self.parse_dimension(&args[3], &mut dimensions.height)
-					{
-						info!("Parsing maze height failed");
-						return false;
-					}
-				}
-				else
-				{
-					self.show_error("Invalid parameters");
-					self.print_usage(program);
-					return false;
-				}
-				tx.send(Job::GenerateMaze(dimensions)).unwrap_or_else(|_| return);
-			},
-			"solve" => {
-				info!("Solve requested");
-				if args.len() != 2
-				{
-					info!("Invalid parameters");
-					return false;
-				}
-				tx.send(Job::SolveMaze).unwrap_or_else(|_| return);
-			},
-			"help" | _ => {
-				self.print_usage(program);
-				return false;
-			},
-		}
-
-		return true;
 	}
 
 	fn run(&mut self)

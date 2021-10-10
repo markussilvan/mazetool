@@ -20,7 +20,6 @@ pub enum Job
 #[derive(Debug)]
 pub enum UIRequest
 {
-	ParseArgs,
 	ShowError(String),
 	ShowInfo(String),
 	ShowMaze(Arc<Mutex<Maze>>),

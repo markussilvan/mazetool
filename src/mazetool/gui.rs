@@ -1,6 +1,5 @@
 // Mazetool - graphical user interface with Piston
 
-use std::env;
 use std::sync::{Arc, Mutex};
 
 use crossbeam::channel::{Receiver, Sender};
@@ -13,7 +12,7 @@ use glam::*;
 
 use super::userinterface::UserInterface;
 use super::common::{ UIRequest, Job };
-use super::maze::{ Dimensions, Maze, MazeCellType, MAZE_DIMENSION_MIN, MAZE_DIMENSION_MAX, MAZE_DIMENSION_DEFAULT };
+use super::maze::{ Maze, MazeCellType };
 
 struct ShowMazeState
 {
@@ -95,24 +94,13 @@ impl event::EventHandler<ggez::GameError> for ShowMazeState
 /// Graphical user interface for Mazetool
 pub struct GraphicalInterface
 {
+	#[allow(dead_code)]
 	tx: Sender<Job>,
 	rx: Receiver<UIRequest>,
 }
 
 impl GraphicalInterface
 {
-	/// Print help text of program's command line argument usage
-	fn print_usage(&self, program: &str)
-	{
-		println!("Usage: {} <command> [options]", program);
-		println!("Run the program in the directory containing the database.");
-		println!("");
-		println!("Commands:");
-		println!("  generate        Generate a new random maze of given size");
-		println!("  solve           Solve a given maze");
-		println!("  help            Print this help");
-	}
-
 	/// Show an info message in the user interface
 	///
 	/// # Parameters
@@ -130,30 +118,9 @@ impl GraphicalInterface
 	///
 	/// * `error`       - Error string to show
 	///
-	fn show_error(&self, error: &str)
+	fn _show_error(&self, error: &str)
 	{
 		println!("Error: {}", error);
-	}
-
-	fn parse_dimension(&self, arg: &str, out: &mut usize) -> bool
-	{
-		let mut ret = true;
-
-		match arg.parse::<usize>()
-		{
-			Ok(n) => *out = n,
-			Err(_) => {
-				self.show_error("Invalid parameters");
-				ret = false;
-			}
-		}
-
-		if *out > MAZE_DIMENSION_MAX && *out < MAZE_DIMENSION_MIN
-		{
-			ret = false;
-		}
-
-		return ret;
 	}
 }
 
@@ -170,73 +137,6 @@ impl UserInterface for GraphicalInterface
 		}
 	}
 
-	/// Parse command line arguments
-	fn parse_args(&self, tx: &Sender<Job>) -> bool
-	{
-		info!("Parsing command line arguments");
-
-		let args: Vec<String> = env::args().collect();
-		let program = &args[0];
-
-		if args.len() < 2
-		{
-			self.print_usage(program);
-			return false;
-		}
-
-		let command = &args[1];
-		match command.as_ref()
-		{
-			"generate" => {
-				info!("Generate requested");
-				let mut dimensions = Dimensions {
-					width: MAZE_DIMENSION_DEFAULT,
-					height: MAZE_DIMENSION_DEFAULT
-				};
-				if args.len() == 2
-				{
-					info!("Using default size");
-				}
-				else if args.len() == 4
-				{
-					info!("Parsing dimensions from command line parameteres");
-					if !self.parse_dimension(&args[2], &mut dimensions.width)
-					{
-						info!("Parsing maze width failed");
-						return false;
-					}
-					if !self.parse_dimension(&args[3], &mut dimensions.height)
-					{
-						info!("Parsing maze height failed");
-						return false;
-					}
-				}
-				else
-				{
-					self.show_error("Invalid parameters");
-					self.print_usage(program);
-					return false;
-				}
-				tx.send(Job::GenerateMaze(dimensions)).unwrap_or_else(|_| return);
-			},
-			"solve" => {
-				info!("Solve requested");
-				if args.len() != 2
-				{
-					info!("Invalid parameters");
-					return false;
-				}
-				tx.send(Job::SolveMaze).unwrap_or_else(|_| return);
-			},
-			"help" | _ => {
-				self.print_usage(program);
-				return false;
-			},
-		}
-
-		return true;
-	}
-
 	fn run(&mut self)
 	{
 		let mut window_mode = ggez::conf::WindowMode::default().dimensions(800.0, 600.0);
@@ -250,15 +150,6 @@ impl UserInterface for GraphicalInterface
 		let rx_clone = self.rx.clone();
 		let screen = ggez::graphics::screen_coordinates(&ctx);
 		ggez::graphics::set_window_title(&ctx, "Mazetool");
-
-		//TODO: just do this here for now (for texting), refactor parse_args later
-		let dimensions = Dimensions {
-			//width: MAZE_DIMENSION_DEFAULT,
-			//height: MAZE_DIMENSION_DEFAULT
-			width: 39,
-			height: 39
-		};
-		self.tx.send(Job::GenerateMaze(dimensions)).unwrap_or_else(|_| return);
 
 		// Handle events. Refer to `winit` docs for more information.
 		event_loop.run(move |mut event, _window_target, control_flow|
@@ -275,9 +166,6 @@ impl UserInterface for GraphicalInterface
 				info!("UI received request: {:?}", request);
 				match request
 				{
-					UIRequest::ParseArgs => {
-						//keep_running = self.parse_args(&self.tx);
-					},
 					UIRequest::ShowError(_message) => {
 						//self.show_error(&message);
 					},
@@ -339,7 +227,6 @@ impl UserInterface for GraphicalInterface
 				x => println!("Device event fired: {:?}", x),
 			}
 		});
-		//TODO: move parse_args out of CommandLineInterface (to main)
 	}
 
 }
