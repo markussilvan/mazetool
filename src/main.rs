@@ -52,12 +52,12 @@ fn main()
 
 	if use_gui
 	{
-		let mut ui = GraphicalInterface::new(from_ui_tx, to_ui_rx);
+		let mut ui = Box::new(GraphicalInterface::new(from_ui_tx, to_ui_rx));
 		ui.run();
 	}
 	else
 	{
-		let mut ui = CommandLineInterface::new(from_ui_tx, to_ui_rx);
+		let mut ui = Box::new(CommandLineInterface::new(from_ui_tx, to_ui_rx));
 		ui.run();
 	};
 

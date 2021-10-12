@@ -149,32 +149,32 @@ impl MazeControl
 		Ok(())
 	}
 
-	/// Recursively dig passages in the maze
+	/// Iteratively dig passages in the maze
 	///
 	/// # Parameters
 	/// * `maze`        - The maze data structure
-	/// * `position`    - Current position in the maze
+	/// * `start`       - Start position in the maze
 	///
-	fn dig(&self, maze: &mut MutexGuard<Maze>, position: usize) -> Result<(), AppError>
+	fn dig(&self, maze: &mut MutexGuard<Maze>, start: usize) -> Result<(), AppError>
 	{
-		debug!("Checking if digging possible at position {}", position);
+		let mut positions : Vec<(usize, Direction)> = Vec::new();
 
-		// generate ranndom order of directions to try for this cell
-		let mut rng = rand::thread_rng();
-		let mut directions = Direction::get_directions();
-		directions.shuffle(&mut rng);
+		MazeControl::push_new_position(&mut positions, start);
 
-		for direction in directions.iter()
+		while let Some((position, direction)) = positions.pop()
 		{
-			match maze.is_diggable(position, *direction)
+			debug!("Moving to position {}", position);
+
+			debug!("Checking if digging possible at position {}", position);
+			match maze.is_diggable(position, direction)
 			{
 				Ok(result) => {
 					if result == true
 					{
 						debug!("Digging new passage towards {}", direction);
-						let new_position = maze.dig_passage(position, *direction)?;
-						debug!("Moving to new position {}", new_position);
-						self.dig(maze, new_position)?; // recurse into digging the next position
+						let new_position = maze.dig_passage(position, direction)?;
+						MazeControl::push_new_position(&mut positions, new_position);
+						continue;
 					}
 					else
 					{
@@ -185,9 +185,21 @@ impl MazeControl
 					debug!("Can't dig to {}, error: {}", direction, e.to_string());
 				}
 			}
+			debug!("Stepping back from {}", position);
 		}
-		debug!("Stepping back from {}", position);
 		Ok(())
+	}
+
+	fn push_new_position(positions: &mut Vec<(usize, Direction)>, position: usize)
+	{
+		let mut rng = rand::thread_rng();
+		let mut directions = Direction::get_directions();
+		directions.shuffle(&mut rng);
+
+		for direction in directions.iter()
+		{
+			positions.push((position, *direction));
+		}
 	}
 
 	/// Solve an already generated maze
