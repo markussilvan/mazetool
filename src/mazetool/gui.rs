@@ -1,4 +1,4 @@
-// Mazetool - graphical user interface with Piston
+// Mazetool - graphical user interface with ggez
 
 use std::sync::{Arc, Mutex};
 
@@ -43,10 +43,9 @@ impl ShowMazeState
 			self.block_size = (std::cmp::min(self.screen.h as usize / m.dimensions.height,
 			                                self.screen.w as usize / m.dimensions.width)) as f32;
 		}
-		//self.block_size = 10.0; //TODO: remove when real block size works...
 	}
 
-	fn handle_show_maze(&mut self, maze: Arc<Mutex<Maze>>)
+	fn set_maze(&mut self, maze: Arc<Mutex<Maze>>)
 	{
 		self.maze = maze.clone();
 	}
@@ -154,8 +153,6 @@ impl UserInterface for GraphicalInterface
 		// Handle events. Refer to `winit` docs for more information.
 		event_loop.run(move |mut event, _window_target, control_flow|
 		{
-			//TODO: create a local copy of maze here (remove it from the class)
-			//      or is some arc mutex thing enough?
 			if !ctx.continuing
 			{
 				*control_flow = ControlFlow::Exit;
@@ -170,11 +167,11 @@ impl UserInterface for GraphicalInterface
 						//self.show_error(&message);
 					},
 					UIRequest::ShowInfo(_message) => {
-						//state.handle_show_maze(&message);
+						//state.show_info(&message);
 					},
 					UIRequest::ShowMaze(maze) => {
-						state.handle_show_maze(maze);
-						state.set_screen_size(screen); //TODO: move this somewhere else?
+						state.set_maze(maze);
+						state.set_screen_size(screen);
 					},
 					UIRequest::Quit => {
 						*control_flow = ControlFlow::Exit;

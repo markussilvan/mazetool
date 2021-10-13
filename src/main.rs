@@ -15,6 +15,7 @@ use crossbeam::channel::unbounded;
 use crossbeam::channel::Sender;
 use simple_logger::SimpleLogger;
 use log::LevelFilter;
+use clap::{Arg, App, AppSettings, SubCommand};
 
 use mazetool::maze::{MAZE_DIMENSION_MIN, MAZE_DIMENSION_MAX, MAZE_DIMENSION_DEFAULT};
 use mazetool::maze::Dimensions;
@@ -23,6 +24,7 @@ use mazetool::userinterface::UserInterface;
 use mazetool::cli::CommandLineInterface;
 use mazetool::gui::GraphicalInterface;
 use mazetool::common::Job;
+
 
 /// Main, the entry poin for the application.
 fn main()
@@ -36,10 +38,10 @@ fn main()
 	// to_ui_rx   - receive from ui to control
 	let (from_ui_tx, from_ui_rx) = unbounded();
 	let (to_ui_tx, to_ui_rx) = unbounded();
-	let use_gui = true;
+	let mut use_gui = false;
 
 	info!("Parsing command line parameters");
-	if !parse_args(&from_ui_tx)
+	if !parse_args(&from_ui_tx, &mut use_gui)
 	{
 		return;
 	}
@@ -69,103 +71,87 @@ fn main()
 }
 
 /// Parse command line arguments
-fn parse_args(tx: &Sender<Job>) -> bool
+fn parse_args(tx: &Sender<Job>, use_gui: &mut bool) -> bool
 {
-	info!("Parsing command line arguments");
-
-	let args: Vec<String> = std::env::args().collect();
-	let program = &args[0];
-
-	if args.len() < 2
+	let mut success = true;
+	let matches = App::new("mazetool")
+	                      .version("0.1.0")
+	                      .author("Markus Silván <markus.silvan@iki.fi>")
+	                      .about("Maze generating and solving tool")
+	                      .setting(AppSettings::SubcommandRequiredElseHelp)
+	                      .args_from_usage("
+	                           --gui                'Use graphical interface'")
+	                      .subcommand(SubCommand::with_name("generate")
+	                                      .about("generates a new maze")
+	                                      .arg(Arg::with_name("x")
+		                                      .required(true)
+		                                      .help("Width of the maze"))
+	                                      .arg(Arg::with_name("y")
+		                                      .required(true)
+		                                      .help("Height of the maze"))
+	                      )
+	                      .subcommand(SubCommand::with_name("solve")
+	                                      .about("solves a given maze")
+	                                      .arg(Arg::with_name("file").required(true))
+	                      )
+	                      .get_matches();
+	
+	if matches.is_present("gui")
 	{
-		print_usage(program);
-		return false;
+		*use_gui = true;
 	}
-
-	let command = &args[1];
-	match command.as_ref()
+	else
 	{
-		"generate" => {
-			info!("Generate requested");
-			let mut dimensions = Dimensions {
-				width: MAZE_DIMENSION_DEFAULT,
-				height: MAZE_DIMENSION_DEFAULT 
-			};
-			if args.len() == 2
+		*use_gui = false;
+	}
+    
+	if let Some(matches) = matches.subcommand_matches("generate")
+	{
+		info!("Generate requested");
+		let mut dimensions = Dimensions {
+			width: MAZE_DIMENSION_DEFAULT,
+			height: MAZE_DIMENSION_DEFAULT 
+		};
+		if let Some(x) = matches.value_of("x")
+		{
+			if let Ok(w) = x.parse()
 			{
-				info!("No dimensions given. Using default size.");
-			}
-			else if args.len() == 4
-			{
-				info!("Parsing dimensions from command line parameteres");
-				if !parse_dimension(&args[2], &mut dimensions.width)
+				if w >= MAZE_DIMENSION_MIN && w <= MAZE_DIMENSION_MAX
 				{
-					info!("Parsing maze width failed");
+					dimensions.width = w;
+				}
+				else
+				{
 					return false;
 				}
-				if !parse_dimension(&args[3], &mut dimensions.height)
-				{
-					info!("Parsing maze height failed");
-					return false;
-				}
 			}
-			else
-			{
-				info!("Invalid parameters");
-				print_usage(program);
-				return false;
-			}
-			tx.send(Job::GenerateMaze(dimensions)).unwrap_or_else(|_| return);
-		},
-		"solve" => {
-			info!("Solve requested");
-			if args.len() != 2
-			{
-				info!("Invalid parameters");
-				print_usage(program);
-				return false;
-			}
-			tx.send(Job::SolveMaze).unwrap_or_else(|_| return);
-		},
-		"help" | _ => {
-			print_usage(program);
-			return false;
-		},
-	}
-
-	return true;
-}
-
-fn print_usage(program: &str)
-{
-	println!("Usage: {} <command> [options]", program);
-	println!("Run the program in the directory containing the database.");
-	println!("");
-	println!("Commands:");
-	println!("  generate        Generate a new random maze of given size");
-	println!("  solve           Solve a given maze");
-	println!("  help            Print this help");
-}
-
-fn parse_dimension(arg: &str, out: &mut usize) -> bool
-{
-	let mut ret = true;
-
-	match arg.parse::<usize>()
-	{
-		Ok(n) => *out = n,
-		Err(_) => {
-			println!("Invalid parameters");
-			ret = false;
 		}
+		if let Some(y) = matches.value_of("y")
+		{
+			// same as above, written in a different way
+			match y.parse()
+			{
+				Ok(h) => {
+					if h >= MAZE_DIMENSION_MIN && h <= MAZE_DIMENSION_MAX
+					{
+						dimensions.height = h;
+					}
+				},
+				Err(_e) => ()
+			}
+		}
+		tx.send(Job::GenerateMaze(dimensions)).unwrap();
+		success = true;
 	}
 
-	if *out > MAZE_DIMENSION_MAX && *out < MAZE_DIMENSION_MIN
+	if let Some(_matches) = matches.subcommand_matches("solve")
 	{
-		ret = false;
+		println!("Solving is not implemented (yet?)");
+		tx.send(Job::SolveMaze).unwrap();
+		success = true;
 	}
 
-	return ret;
+    return success;
 }
 
 #[cfg(test)]
