@@ -155,13 +155,33 @@ fn parse_args(tx: &Sender<Job>, use_gui: &mut bool) -> bool
 }
 
 #[cfg(test)]
-mod tests {
+mod tests
+{
 	use super::*;
 
 	#[test]
-	fn create_control_from_main()
+	fn create_cli()
 	{
-		let _ : MazeControl<CommandLineInterface> = MazeControl::new();
+		let (from_ui_tx, _from_ui_rx) = unbounded();
+		let (_to_ui_tx, to_ui_rx) = unbounded();
+		let _ = CommandLineInterface::new(from_ui_tx, to_ui_rx);
+	}
+
+	#[test]
+	fn create_gui()
+	{
+		let (from_ui_tx, _from_ui_rx) = unbounded();
+		let (_to_ui_tx, to_ui_rx) = unbounded();
+		let _ = GraphicalInterface::new(from_ui_tx, to_ui_rx);
+	}
+
+	#[test]
+	fn run_and_quit_control()
+	{
+		let (from_ui_tx, from_ui_rx) = unbounded();
+		let (to_ui_tx, _to_ui_rx) = unbounded();
+		let _ = MazeControl::run(from_ui_rx, to_ui_tx);
+		from_ui_tx.send(Job::Quit).unwrap();
 	}
 }
 
