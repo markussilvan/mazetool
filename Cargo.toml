@@ -8,7 +8,6 @@ readme = "README.md"
 edition = "2021"
 
 [dependencies]
-getopts = "0.2"
 log = "0.4"
 simple_logger = "1.11"
 rand = "0.8"
