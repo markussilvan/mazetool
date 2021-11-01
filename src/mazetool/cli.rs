@@ -84,11 +84,6 @@ impl CommandLineInterface
 
 	/// Handle a single request from the controller
 	///
-	/// # Parameters
-	///
-	/// * `tx`      - Channel for giving Jobs to the controller
-	/// * `rx`      - Channel to receive UI requests from controller
-	///
 	/// # Returns
 	///
 	/// * `bool`    - True, if UI thread should keep running
