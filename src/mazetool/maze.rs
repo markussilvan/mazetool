@@ -15,13 +15,30 @@ pub const MAZE_DIMENSION_MIN : usize = 10;
 pub const MAZE_DIMENSION_MAX : usize = 10000;
 pub const MAZE_DIMENSION_DEFAULT : usize = 19;
 
+#[derive(Clone, Copy)]
+enum GraphNodeType
+{
+	NA,
+	Straight,
+	Intersection, // or a corner
+	DeadEnd,
+	End,
+}
+
+struct GraphNodeInfo
+{
+	position: usize,
+	nodetype: GraphNodeType,
+	directions: Vec<Direction>,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Direction
 {
 	North,
 	East,
-	South,
-	West
+	West,
+	South
 }
 
 impl Direction
@@ -30,8 +47,8 @@ impl Direction
 	{
 		let directions: [Direction; NUM_OF_DIRECTIONS] = [ Direction::North,
 		                                                   Direction::East,
-		                                                   Direction::South,
-		                                                   Direction::West ];
+		                                                   Direction::West,
+		                                                   Direction::South ];
 		return directions;
 	}
 
@@ -46,16 +63,29 @@ impl Direction
 		}
 	}
 
-//	pub fn from_u8(value: u8) -> Direction
-//	{
-//		match value
-//		{
-//			0 => Direction::North,
-//			1 => Direction::East,
-//			2 => Direction::South,
-//			3 | _ => Direction::West,
-//		}
-//	}
+	pub fn remove_direction(directions: &mut Vec<Direction>, direction: Direction) -> bool
+	{
+		if let Some(i) = directions.iter().position(|x| *x == direction)
+		{
+			directions.remove(i);
+			true
+		}
+		else
+		{
+			false
+		}
+	}
+
+	pub fn from_usize(value: usize) -> Direction
+	{
+		match value
+		{
+			0 => Direction::North,
+			1 => Direction::East,
+			2 => Direction::South,
+			3 | _ => Direction::West,
+		}
+	}
 }
 
 impl Display for Direction
@@ -65,8 +95,8 @@ impl Display for Direction
 		let c = match &*self {
 			Direction::North => "North",
 			Direction::East => "East",
-			Direction::South => "South",
 			Direction::West => "West",
+			Direction::South => "South",
 		};
         write!(f, "{}", c)
     }
@@ -109,7 +139,7 @@ impl FromStr for MazeCellType
 	type Err = AppError;
 	fn from_str(hex_code: &str) -> Result<Self, Self::Err> {
 		//TODO: proper implementation for MazeCellType
-        let celltype: u8 = u8::from_str_radix(&hex_code[0..1], 16)?;
+        let _celltype: u8 = u8::from_str_radix(&hex_code[0..1], 16)?;
         Ok(MazeCellType::Wall)
 
         // u8::from_str_radix(src: &str, radix: u32) converts a string
@@ -128,6 +158,7 @@ pub struct MazeCell
 {
 	pub celltype: MazeCellType,
 	pub visited: bool,
+	pub nodes: [Option<usize>; NUM_OF_DIRECTIONS],
 }
 
 impl Display for MazeCell
@@ -144,6 +175,7 @@ pub struct Maze
 {
 	pub dimensions: Dimensions,
 	pub cells: Vec<MazeCell>,
+	pub start: usize,
 }
 
 impl std::fmt::Debug for Maze
@@ -159,13 +191,17 @@ impl Maze
 	/// Create a new maze structure
 	pub fn new() -> Maze
 	{
-		let default_cell = MazeCell { celltype: MazeCellType::Wall, visited: false };
+		let default_cell = MazeCell {
+			celltype: MazeCellType::Wall,
+			visited: false,
+			nodes: [None; NUM_OF_DIRECTIONS]};
 		let maze = Maze {
 			cells: vec![default_cell; MAZE_DIMENSION_DEFAULT * MAZE_DIMENSION_DEFAULT],
 			dimensions: Dimensions {
 				width: MAZE_DIMENSION_DEFAULT,
 				height: MAZE_DIMENSION_DEFAULT
 			},
+			start: 0,
 		};
 
 		return maze;
@@ -318,7 +354,10 @@ impl Maze
 
 		if self.cells.len() != new_size
 		{
-			let default_cell = MazeCell { celltype: MazeCellType::Wall, visited: false };
+			let default_cell = MazeCell {
+				celltype: MazeCellType::Wall,
+				visited: false,
+				nodes: [None; NUM_OF_DIRECTIONS]};
 			self.cells.resize(new_size, default_cell);
 		}
 
@@ -344,7 +383,7 @@ impl Maze
 	///
 	/// Returns a boolean value.
 	///
-	pub fn is_diggable(&mut self,
+	pub fn is_diggable(&self,
 	                   position: usize,
 	                   direction: Direction
 	) -> Result<bool, AppError>
@@ -363,11 +402,8 @@ impl Maze
 		// check all (other) positions around it (they must walls, or the end, all around)
 		let mut directions: Vec<Direction> = Direction::get_directions().iter().cloned().collect();
 		let opposite_direction = direction.get_opposite_direction();
-		if let Some(pos) = directions.iter().position(|x| *x == opposite_direction)
-		{
-			directions.remove(pos);
-		}
-		else
+
+		if !Direction::remove_direction(&mut directions, opposite_direction)
 		{
 			return Err(AppError::new("Error while handling directions"));
 		}
@@ -449,7 +485,7 @@ impl Maze
 		self.cells[end_pos].celltype = MazeCellType::End;
 	}
 
-	fn is_wall_or_end_position(&mut self, position: usize) -> bool
+	fn is_wall_or_end_position(&self, position: usize) -> bool
 	{
 		if ![MazeCellType::Wall, MazeCellType::End].contains(&self.cells[position].celltype)
 		{
@@ -458,7 +494,7 @@ impl Maze
 		return true;
 	}
 
-	fn get_neighboring_position(&mut self,
+	fn get_neighboring_position(&self,
 	                            position: usize,
 	                            direction: Direction
 	) -> Result<usize, AppError>
@@ -479,16 +515,16 @@ impl Maze
 					return Ok(position + 1);
 				}
 			},
-			Direction::South => {
-				if (position + self.dimensions.width) < len
-				{
-					return Ok(position + self.dimensions.width);
-				}
-			},
 			Direction::West => {
 				if (position > 0) && (position % self.dimensions.width != 0)
 				{
 					return Ok(position - 1);
+				}
+			},
+			Direction::South => {
+				if (position + self.dimensions.width) < len
+				{
+					return Ok(position + self.dimensions.width);
 				}
 			},
 		};
@@ -496,7 +532,7 @@ impl Maze
 		return Err(AppError::new("Invalid maze position encountered"));
 	}
 
-	fn are_sides_diggable(&mut self, position: usize, direction: Direction) -> bool
+	fn are_sides_diggable(&self, position: usize, direction: Direction) -> bool
 	{
 		// check "sides" or "corners" of the test_position are also "diggable"
 		let mut sides: [usize; 2] = [0, 0];
@@ -548,4 +584,204 @@ impl Maze
 
 		return position;
 	}
+
+	/// Generate a topology graph of this maze.
+	pub fn create_topology_graph(&mut self) -> bool
+	{
+		let mut stack: Vec<(usize, usize, Direction)> = Vec::new();
+
+		// find start position
+		for i in 0..self.dimensions.width
+		{
+			if self.cells[i].celltype == MazeCellType::Start
+			{
+				self.start = i;
+				stack.push((i, i, Direction::South)); // only way from the start is south
+				break;
+			}
+		}
+
+		while let Some((previous, position, direction)) = stack.pop()
+		{
+			let node_info = self.check_passage(position, direction);
+			match node_info.nodetype
+			{
+				GraphNodeType::Straight => {
+					stack.push((previous, node_info.position, direction));
+				},
+				GraphNodeType::Intersection => {
+					for dir in node_info.directions.iter()
+					{
+						stack.push((node_info.position, node_info.position, *dir));
+					}
+					self.add_topology_node(previous, node_info.position, direction);
+				},
+				GraphNodeType::DeadEnd => {
+					self.add_topology_node(previous, node_info.position, direction);
+				},
+				GraphNodeType::End => {
+					self.add_topology_node(previous, node_info.position, direction);
+					//break;
+				},
+				GraphNodeType::NA => {
+					debug!("Internal error. Invalid maze position encountered {}", position);
+					break;
+				},
+			}
+		}
+		true
+	}
+
+	fn check_passage(&self, position: usize, direction: Direction) -> GraphNodeInfo
+	{
+		let mut node_info = GraphNodeInfo {
+			position: 0,
+			nodetype: GraphNodeType::NA,
+			directions: Vec::new()
+		};
+
+		if let Ok(pos) = self.get_neighboring_position(position, direction)
+		{
+			if self.cells[pos].celltype == MazeCellType::Passage
+			{
+				let opposite_direction = direction.get_opposite_direction();
+				node_info.directions = self.get_possible_directions(pos, opposite_direction);
+
+				match node_info.directions.len()
+				{
+					0 => {
+						node_info.nodetype = GraphNodeType::DeadEnd;
+					},
+					1 => {
+						if node_info.directions[0] == direction
+						{
+							node_info.nodetype = GraphNodeType::Straight;
+						}
+						else
+						{
+							// a corner
+							node_info.nodetype = GraphNodeType::Intersection;
+						}
+					},
+					_ => {
+						node_info.nodetype = GraphNodeType::Intersection;
+					},
+				}
+				node_info.position = pos;
+			}
+			else if self.cells[pos].celltype == MazeCellType::End
+			{
+				node_info.position = pos;
+				node_info.nodetype = GraphNodeType::End;
+			}
+		}
+		debug!("Topology: node_info position: {}, nodetype: {}, num directions: {}",
+		       node_info.position,
+		       node_info.nodetype as usize,
+		       node_info.directions.len());
+		return node_info;
+	}
+
+	// Get all possible directions to proceed
+	// (not including the direction given as parameter)
+	fn get_possible_directions(&self, position: usize, direction: Direction) -> Vec<Direction>
+	{
+		let mut directions: Vec<Direction> = Direction::get_directions().iter().cloned().collect();
+
+		// remove incoming direction from directions
+		if !Direction::remove_direction(&mut directions, direction)
+		{
+			debug!("Internal error. Removing incoming direction failed.");
+		}
+
+		let mut result = directions.clone();
+
+		// check other directions
+		for test_direction in directions
+		{
+			if let Ok(pos) = self.get_neighboring_position(position, test_direction)
+			{
+				if self.cells[pos].celltype == MazeCellType::Wall
+				{
+					Direction::remove_direction(&mut result, test_direction);
+				}
+			}
+			else
+			{
+				Direction::remove_direction(&mut result, test_direction);
+			}
+		}
+
+		result
+	}
+
+	fn add_topology_node(&mut self, start: usize, end: usize, direction: Direction)
+	{
+		debug!("Topology: adding node, start: {}, end: {}, direction: {}", start, end, direction);
+		self.cells[start].nodes[direction as usize] = Some(end);
+		self.cells[end].nodes[direction.get_opposite_direction() as usize] = Some(start);
+	}
+}
+
+impl<'a> IntoIterator for &'a Maze {
+	type Item = (usize, usize, usize, usize, &'a MazeCell);
+	type IntoIter = MazeGraphIterator<'a>;
+
+	fn into_iter(self) -> Self::IntoIter {
+		let mut iter = MazeGraphIterator {
+			maze: self,
+			stack: Vec::new(),
+		};
+
+		// find start position
+		for i in 0..self.dimensions.width
+		{
+			if self.cells[i].celltype == MazeCellType::Start
+			{
+				iter.stack.push((i, Direction::South)); // only way from the start is south
+				break;
+			}
+		}
+
+		iter
+	}
+}
+
+pub struct MazeGraphIterator<'a>
+{
+	maze: &'a Maze,
+	stack: Vec<(usize, Direction)>,
+}
+
+impl<'a> Iterator for MazeGraphIterator<'a>
+{
+	type Item = (usize, usize, usize, usize, &'a MazeCell);
+	fn next(&mut self) -> Option<(usize, usize, usize, usize, &'a MazeCell)>
+	{
+		let mut new_position = 0;
+		if let Some((position, direction)) = self.stack.pop()
+		{
+			debug!("Iterator: popped position {}, direction {}", position, direction);
+			if let Some(pos) = self.maze.cells[position].nodes[direction as usize]
+			{
+				new_position = pos;
+				for dir in Direction::get_directions()
+				{
+					if (self.maze.cells[pos].nodes[dir as usize] != None) &&
+					   (dir != direction.get_opposite_direction())
+					{
+						self.stack.push((pos, dir));
+					}
+				}
+			}
+
+			let y = new_position / self.maze.dimensions.width;
+			let x = new_position % self.maze.dimensions.width;
+			let prev_y = position / self.maze.dimensions.width;
+			let prev_x = position % self.maze.dimensions.width;
+
+			return Some((prev_x, prev_y, x, y, &self.maze.cells[position]));
+		}
+		None
+    }
 }

@@ -8,12 +8,20 @@ use std::sync::{ Arc, Mutex };
 
 use super::maze::{ Dimensions, Maze };
 
+#[derive(Debug)]
+pub enum SolveMethod
+{
+	GraphOnly,
+	_GraphElimination,
+	_AStar
+}
+
 /// Commands given by the user (interface) to the control logic
 #[derive(Debug)]
 pub enum Job
 {
 	GenerateMaze(Dimensions),
-	SolveMaze,
+	SolveMaze(SolveMethod),
 	Quit
 }
 

@@ -61,11 +61,17 @@ impl event::EventHandler<ggez::GameError> for ShowMazeState
 
 	fn draw(&mut self, ctx: &mut Context) -> GameResult
 	{
-
 		let rect = graphics::Rect::new(0.0, 0.0, self.block_size, self.block_size);
 		let wall = graphics::Mesh::new_rectangle(ctx,
 		                                         graphics::DrawMode::fill(),
 		                                         rect, Color::WHITE)?;
+
+		let node = graphics::Mesh::new_circle(ctx,
+		                                      graphics::DrawMode::fill(),
+		                                      Vec2::new(0.0, 0.0),
+		                                      self.block_size / 3.0,
+		                                      2.0,
+		                                      Color::GREEN)?;
 
 		graphics::clear(ctx, [0.1, 0.2, 0.3, 1.0].into());
 
@@ -75,12 +81,56 @@ impl event::EventHandler<ggez::GameError> for ShowMazeState
 			{
 				for y in 0..m.dimensions.height
 				{
-					if m.cells[x + (y * m.dimensions.width)].celltype == MazeCellType::Wall
+					let cell = &m.cells[x + (y * m.dimensions.width)];
+					let pos_x = x as f32 * self.block_size;
+					let pos_y = y as f32 * self.block_size;
+
+					// draw maze walls
+					if cell.celltype == MazeCellType::Wall
 					{
-						let pos_x = x as f32 * self.block_size;
-						let pos_y = y as f32 * self.block_size;
 						graphics::draw(ctx, &wall, (Vec2::new(pos_x, pos_y),))?;
 					}
+
+					// draw maze topology graph nodes
+					for i in 0..cell.nodes.len()
+					{
+						if let Some(n) = cell.nodes[i]
+						{
+							graphics::draw(ctx, &node, (Vec2::new(pos_x + self.block_size / 2.0,
+							                                      pos_y + self.block_size / 2.0),))?;
+							break;
+						}
+					}
+				}
+			}
+
+			// draw maze topology graph connections
+			info!("Draw topology connections");
+			for (px, py, x, y, _cell) in m.into_iter()
+			{
+				debug!("Maze graph terator returned x = {}, y = {}", x, y);
+				let pos_x = x as f32 * self.block_size + (self.block_size / 2.0);
+				let pos_y = y as f32 * self.block_size + (self.block_size / 2.0);
+				let prev_x = px as f32 * self.block_size + (self.block_size / 2.0);
+				let prev_y = py as f32 * self.block_size + (self.block_size / 2.0);
+
+				if (prev_x != pos_x) || (prev_y != pos_y)
+				{
+					let points = &[Vec2::new(prev_x, prev_y), Vec2::new(pos_x, pos_y)];
+					let mut line_width = self.block_size / 10.0;
+					if line_width < 0.6
+					{
+						line_width = 0.6;
+					}
+					let connection = graphics::Mesh::new_line(ctx,
+					                                          points,
+					                                          line_width,
+					                                          Color::GREEN)?;
+					graphics::draw(ctx, &connection, (Vec2::new(0.0, 0.0),))?;
+				}
+				else
+				{
+					info!("Error drawing connections, previous is 0.0");
 				}
 			}
 		}

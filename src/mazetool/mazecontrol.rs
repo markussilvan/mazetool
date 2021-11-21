@@ -11,6 +11,7 @@ use crossbeam::channel::{Receiver, Sender};
 use rand::seq::SliceRandom;
 
 use super::common::{ UIRequest, Job, AppError };
+use super::common::SolveMethod;
 use super::maze::{ Direction, Dimensions, Maze };
 
 /// A class for main logic (controller)
@@ -82,8 +83,20 @@ impl MazeControl
 								Err(e) => self.show_error(format!("Error generating maze: {}", e))
 							};
 						},
-						Job::SolveMaze => {
-							self.solve_maze();
+						Job::SolveMaze(method) => {
+							match method
+							{
+								SolveMethod::GraphOnly => {
+									match self.generate_graph()
+									{
+										Ok(_) => info!("Graph generated successfully"),
+										Err(e) => self.show_error(format!("Error generating graph: {}", e))
+									};
+								},
+								_ => {
+									self.solve_maze();
+								}
+							}
 						},
 						Job::Quit => {
 							break;
@@ -145,7 +158,7 @@ impl MazeControl
 		}
 
 		self.tx.send(UIRequest::ShowMaze(self.maze.clone())).unwrap_or_else(|_| return);
-		self.tx.send(UIRequest::Quit).unwrap_or_else(|_| return);
+		//self.tx.send(UIRequest::Quit).unwrap_or_else(|_| return);
 		Ok(())
 	}
 
@@ -200,6 +213,24 @@ impl MazeControl
 		{
 			positions.push((position, *direction));
 		}
+	}
+
+	fn generate_graph(&mut self) -> Result<(), AppError>
+	{
+		match self.maze.lock()
+		{
+			Ok(mut m) => {
+				debug!("Generating topogoly graph");
+				m.create_topology_graph();
+			},
+			Err(e) => {
+				self.show_error(e.to_string());
+			},
+		}
+
+		self.tx.send(UIRequest::ShowMaze(self.maze.clone())).unwrap_or_else(|_| return);
+		//TODO: wtf? self.tx.send(UIRequest::Quit).unwrap_or_else(|_| return);
+		Ok(())
 	}
 
 	/// Solve an already generated maze

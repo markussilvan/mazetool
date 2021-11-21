@@ -24,7 +24,7 @@ use mazetool::userinterface::UserInterface;
 use mazetool::cli::CommandLineInterface;
 use mazetool::gui::GraphicalInterface;
 use mazetool::common::Job;
-
+use mazetool::common::SolveMethod;
 
 /// Main, the entry poin for the application.
 fn main()
@@ -92,7 +92,7 @@ fn parse_args(tx: &Sender<Job>, use_gui: &mut bool) -> bool
 	                      )
 	                      .subcommand(SubCommand::with_name("solve")
 	                                      .about("solves a given maze")
-	                                      .arg(Arg::with_name("file").required(true))
+	                                      //.arg(Arg::with_name("file").required(true))
 	                      )
 	                      .get_matches();
 	
@@ -141,13 +141,14 @@ fn parse_args(tx: &Sender<Job>, use_gui: &mut bool) -> bool
 			}
 		}
 		tx.send(Job::GenerateMaze(dimensions)).unwrap();
+		tx.send(Job::SolveMaze(SolveMethod::GraphOnly)).unwrap(); //TODO: TEMP JUST FOR TESTING
 		success = true;
 	}
 
 	if let Some(_matches) = matches.subcommand_matches("solve")
 	{
 		println!("Solving is not implemented (yet?)");
-		tx.send(Job::SolveMaze).unwrap();
+		tx.send(Job::SolveMaze(SolveMethod::GraphOnly)).unwrap();
 		success = true;
 	}
 
