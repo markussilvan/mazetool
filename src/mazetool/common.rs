@@ -12,7 +12,7 @@ use super::maze::{ Dimensions, Maze };
 pub enum SolveMethod
 {
 	GraphOnly,
-	_GraphElimination,
+	GraphElimination,
 	_AStar
 }
 

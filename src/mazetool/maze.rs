@@ -82,8 +82,8 @@ impl Direction
 		{
 			0 => Direction::North,
 			1 => Direction::East,
-			2 => Direction::South,
-			3 | _ => Direction::West,
+			2 => Direction::West,
+			3 | _ => Direction::South,
 		}
 	}
 }
@@ -585,8 +585,84 @@ impl Maze
 		return position;
 	}
 
+	pub fn run_graph_elimination(&mut self)
+	{
+		info!("Running graph elimination");
+		//TODO: implementation
+		//    - use the iterator to find the dead ends?
+
+		// quick and dirty
+		let mut found = true;
+		while found
+		{
+			found = false;
+
+			for i in self.dimensions.width..(self.cells.len() - self.dimensions.width)
+			{
+				// just for optimization, skip walls
+				if self.cells[i].celltype == MazeCellType::Wall
+				{
+					continue;
+				}
+
+				let mut leaf = Some(i);
+				while let Some(b) = leaf
+				{
+					if self.get_num_of_graph_connections(b) == 1
+					{
+						found = true;
+						leaf = self.remove_dead_end(b);
+					}
+					else
+					{
+						leaf = None
+					}
+				}
+
+				continue;
+			}
+		}
+		info!("Graph elimination done");
+	}
+
+	fn get_num_of_graph_connections(&mut self, position: usize) -> usize
+	{
+		let mut count = 0;
+
+		for i in 0..NUM_OF_DIRECTIONS
+		{
+			if self.cells[position].nodes[i] != None
+			{
+				count += 1;
+			}
+		}
+
+		count
+	}
+
+	fn remove_dead_end(&mut self, position: usize) -> Option<usize>
+	{
+		info!("DEBUG: Removing dead end, position {}", position);
+		for i in 0..NUM_OF_DIRECTIONS
+		{
+			if self.cells[position].nodes[i] != None
+			{
+				if let Some(prev) = self.cells[position].nodes[i]
+				{
+					let opposite = Direction::from_usize(i).get_opposite_direction();
+					self.cells[prev].nodes[opposite as usize] = None;
+					self.cells[position].nodes[i] = None;
+					info!("DEBUG: Return Some({})", prev);
+					return Some(prev);
+				}
+			}
+		}
+		info!("DEBUG: Return None");
+		None
+	}
+
 	/// Generate a topology graph of this maze.
-	pub fn create_topology_graph(&mut self) -> bool
+	pub fn create_topology_graph(&mut self)
 	{
 		let mut stack: Vec<(usize, usize, Direction)> = Vec::new();
 
@@ -629,7 +705,6 @@ impl Maze
 				},
 			}
 		}
-		true
 	}
 
 	fn check_passage(&self, position: usize, direction: Direction) -> GraphNodeInfo

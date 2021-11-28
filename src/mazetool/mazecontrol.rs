@@ -93,6 +93,14 @@ impl MazeControl
 										Err(e) => self.show_error(format!("Error generating graph: {}", e))
 									};
 								},
+								SolveMethod::GraphElimination => {
+									match self.generate_graph()
+									{
+										Ok(_) => info!("Graph generated successfully"),
+										Err(e) => self.show_error(format!("Error generating graph: {}", e))
+									};
+									self.run_graph_elimination();
+								},
 								_ => {
 									self.solve_maze();
 								}
@@ -229,7 +237,23 @@ impl MazeControl
 		}
 
 		self.tx.send(UIRequest::ShowMaze(self.maze.clone())).unwrap_or_else(|_| return);
-		//TODO: wtf? self.tx.send(UIRequest::Quit).unwrap_or_else(|_| return);
+		Ok(())
+	}
+
+	fn run_graph_elimination(&mut self) -> Result<(), AppError>
+	{
+		match self.maze.lock()
+		{
+			Ok(mut m) => {
+				debug!("Eliminating dead ends from the graph");
+				m.run_graph_elimination();
+			},
+			Err(e) => {
+				self.show_error(e.to_string());
+			},
+		}
+
+		self.tx.send(UIRequest::ShowMaze(self.maze.clone())).unwrap_or_else(|_| return);
 		Ok(())
 	}
 

@@ -141,7 +141,8 @@ fn parse_args(tx: &Sender<Job>, use_gui: &mut bool) -> bool
 			}
 		}
 		tx.send(Job::GenerateMaze(dimensions)).unwrap();
-		tx.send(Job::SolveMaze(SolveMethod::GraphOnly)).unwrap(); //TODO: TEMP JUST FOR TESTING
+		//tx.send(Job::SolveMaze(SolveMethod::GraphOnly)).unwrap(); //TODO: TEMP JUST FOR TESTING
+		tx.send(Job::SolveMaze(SolveMethod::GraphElimination)).unwrap(); //TODO: TEMP JUST FOR TESTING
 		success = true;
 	}
 
