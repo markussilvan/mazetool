@@ -585,44 +585,38 @@ impl Maze
 		return position;
 	}
 
-	pub fn run_graph_elimination(&mut self)
+	pub fn run_graph_elimination(&mut self, step: bool) -> bool
 	{
-		info!("Running graph elimination");
-		//TODO: implementation
-		//    - use the iterator to find the dead ends?
-
-		// quick and dirty
-		let mut found = true;
-		while found
+		for i in self.dimensions.width..(self.cells.len() - self.dimensions.width)
 		{
-			found = false;
-
-			for i in self.dimensions.width..(self.cells.len() - self.dimensions.width)
+			// just for optimization, skip walls, start and end
+			if self.cells[i].celltype != MazeCellType::Passage
 			{
-				// just for optimization, skip walls
-				if self.cells[i].celltype == MazeCellType::Wall
-				{
-					continue;
-				}
-
-				let mut leaf = Some(i);
-				while let Some(b) = leaf
-				{
-					if self.get_num_of_graph_connections(b) == 1
-					{
-						found = true;
-						leaf = self.remove_dead_end(b);
-					}
-					else
-					{
-						leaf = None
-					}
-				}
-
 				continue;
 			}
+
+			let mut leaf = Some(i);
+			while let Some(node) = leaf
+			{
+				if self.get_num_of_graph_connections(node) == 1
+				{
+					leaf = self.remove_dead_end(node);
+
+					if step
+					{
+						info!("Graph elimination stepped");
+						return true;
+					}
+				}
+				else
+				{
+					leaf = None
+				}
+			}
 		}
+
 		info!("Graph elimination done");
+		return false;
 	}
 
 	fn get_num_of_graph_connections(&mut self, position: usize) -> usize
@@ -642,7 +636,6 @@ impl Maze
 
 	fn remove_dead_end(&mut self, position: usize) -> Option<usize>
 	{
-		info!("DEBUG: Removing dead end, position {}", position);
 		for i in 0..NUM_OF_DIRECTIONS
 		{
 			if self.cells[position].nodes[i] != None
@@ -652,12 +645,10 @@ impl Maze
 					let opposite = Direction::from_usize(i).get_opposite_direction();
 					self.cells[prev].nodes[opposite as usize] = None;
 					self.cells[position].nodes[i] = None;
-					info!("DEBUG: Return Some({})", prev);
 					return Some(prev);
 				}
 			}
 		}
-		info!("DEBUG: Return None");
 		None
 	}
 

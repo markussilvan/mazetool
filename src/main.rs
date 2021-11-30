@@ -10,12 +10,12 @@ mod mazetool;
 
 use std::io;
 use std::io::Write;
+use std::str::FromStr;
 
 use crossbeam::channel::unbounded;
-use crossbeam::channel::Sender;
 use simple_logger::SimpleLogger;
 use log::LevelFilter;
-use clap::{Arg, App, AppSettings, SubCommand};
+use clap::{Arg, App, AppSettings, SubCommand, ArgMatches};
 
 use mazetool::maze::{MAZE_DIMENSION_MIN, MAZE_DIMENSION_MAX, MAZE_DIMENSION_DEFAULT};
 use mazetool::maze::Dimensions;
@@ -25,6 +25,28 @@ use mazetool::cli::CommandLineInterface;
 use mazetool::gui::GraphicalInterface;
 use mazetool::common::Job;
 use mazetool::common::SolveMethod;
+
+struct Config
+{
+	use_gui: bool,
+	solve: Option<SolveMethod>,
+	dimensions: Dimensions,
+}
+
+impl Config
+{
+	fn new() -> Self
+	{
+		Config {
+			use_gui: false,
+			solve: None,
+			dimensions: Dimensions {
+				width: MAZE_DIMENSION_DEFAULT,
+				height: MAZE_DIMENSION_DEFAULT 
+			}
+		}
+	}
+}
 
 /// Main, the entry poin for the application.
 fn main()
@@ -38,10 +60,10 @@ fn main()
 	// to_ui_rx   - receive from ui to control
 	let (from_ui_tx, from_ui_rx) = unbounded();
 	let (to_ui_tx, to_ui_rx) = unbounded();
-	let mut use_gui = false;
+	let mut config = Config::new();
 
 	info!("Parsing command line parameters");
-	if !parse_args(&from_ui_tx, &mut use_gui)
+	if !parse_args(&mut config)
 	{
 		return;
 	}
@@ -52,16 +74,35 @@ fn main()
 
 	info!("Creating user interface");
 
-	if use_gui
+	from_ui_tx.send(Job::GenerateMaze(config.dimensions)).unwrap();
+
+	//TODO: works here (but not after constructing gui) (which is what i need)
+	if let Some(solve_method) = config.solve
 	{
-		let mut ui = Box::new(GraphicalInterface::new(from_ui_tx, to_ui_rx));
+		from_ui_tx.send(Job::SolveMaze(solve_method)).unwrap();
+	}
+	else
+	{
+		//from_ui_tx.send(Job::SolveMaze(SolveMethod::GraphElimination)).unwrap();
+	}
+
+	//std::thread::sleep(std::time::Duration::from_millis(1000));
+
+	if config.use_gui
+	{
+		let mut ui = Box::new(GraphicalInterface::new(from_ui_tx.clone(), to_ui_rx));
 		ui.run();
 	}
 	else
 	{
-		let mut ui = Box::new(CommandLineInterface::new(from_ui_tx, to_ui_rx));
+		let mut ui = Box::new(CommandLineInterface::new(from_ui_tx.clone(), to_ui_rx));
 		ui.run();
 	};
+
+	//if let Some(solve_method) = config.solve
+	//{
+	//	from_ui_tx.send(Job::SolveMaze(solve_method)).unwrap();
+	//}
 
 	info!("Main (UI) thread waiting for children to join");
 	control_handle.join().unwrap_or_else(|_| return);
@@ -71,9 +112,9 @@ fn main()
 }
 
 /// Parse command line arguments
-fn parse_args(tx: &Sender<Job>, use_gui: &mut bool) -> bool
+fn parse_args(config: &mut Config) -> bool
 {
-	let mut success = true;
+	let mut success = false;
 	let matches = App::new("mazetool")
 	                      .version("0.1.0")
 	                      .author("Markus Silván <markus.silvan@iki.fi>")
@@ -92,68 +133,91 @@ fn parse_args(tx: &Sender<Job>, use_gui: &mut bool) -> bool
 	                      )
 	                      .subcommand(SubCommand::with_name("solve")
 	                                      .about("solves a given maze")
-	                                      //.arg(Arg::with_name("file").required(true))
+	                                      .arg(Arg::with_name("method")
+		                                      .required(true))
+	                                          .help("GraphOnly, GraphElimination or AStar")
+	                                      .arg(Arg::with_name("x")
+		                                      .required(false)
+		                                      .help("Width of the maze"))
+	                                      .arg(Arg::with_name("y")
+		                                      .required(false)
+		                                      .help("Height of the maze"))
 	                      )
 	                      .get_matches();
 	
 	if matches.is_present("gui")
 	{
-		*use_gui = true;
+		config.use_gui = true;
 	}
 	else
 	{
-		*use_gui = false;
+		config.use_gui = false;
 	}
     
-	if let Some(matches) = matches.subcommand_matches("generate")
+	if let Some(generate_matches) = matches.subcommand_matches("generate")
 	{
 		info!("Generate requested");
-		let mut dimensions = Dimensions {
-			width: MAZE_DIMENSION_DEFAULT,
-			height: MAZE_DIMENSION_DEFAULT 
-		};
-		if let Some(x) = matches.value_of("x")
-		{
-			if let Ok(w) = x.parse()
-			{
-				if w >= MAZE_DIMENSION_MIN && w <= MAZE_DIMENSION_MAX
-				{
-					dimensions.width = w;
-				}
-				else
-				{
-					return false;
-				}
-			}
-		}
-		if let Some(y) = matches.value_of("y")
-		{
-			// same as above, written in a different way
-			match y.parse()
-			{
-				Ok(h) => {
-					if h >= MAZE_DIMENSION_MIN && h <= MAZE_DIMENSION_MAX
-					{
-						dimensions.height = h;
-					}
-				},
-				Err(_e) => ()
-			}
-		}
-		tx.send(Job::GenerateMaze(dimensions)).unwrap();
-		//tx.send(Job::SolveMaze(SolveMethod::GraphOnly)).unwrap(); //TODO: TEMP JUST FOR TESTING
-		tx.send(Job::SolveMaze(SolveMethod::GraphElimination)).unwrap(); //TODO: TEMP JUST FOR TESTING
-		success = true;
+		success = parse_dimensions(config, generate_matches);
 	}
 
-	if let Some(_matches) = matches.subcommand_matches("solve")
+	if let Some(solve_matches) = matches.subcommand_matches("solve")
 	{
-		println!("Solving is not implemented (yet?)");
-		tx.send(Job::SolveMaze(SolveMethod::GraphOnly)).unwrap();
-		success = true;
+		if let Some(m) = solve_matches.value_of("method")
+		{
+			if let Ok(method) = SolveMethod::from_str(m)
+			{
+				config.solve = Some(method);
+				success = true;
+			}
+			else
+			{
+				println!("Invalid solve method specified");
+				success = false;
+			}
+		}
+		if success == true
+		{
+			success = parse_dimensions(config, solve_matches);
+		}
 	}
 
     return success;
+}
+
+fn parse_dimensions(config: &mut Config, matches: &ArgMatches<'_>) -> bool
+{
+	if let Some(x) = matches.value_of("x")
+	{
+		if let Ok(w) = x.parse()
+		{
+			if w >= MAZE_DIMENSION_MIN && w <= MAZE_DIMENSION_MAX
+			{
+				config.dimensions.width = w;
+			}
+			else
+			{
+				return false;
+			}
+		}
+	}
+	if let Some(y) = matches.value_of("y")
+	{
+		// same as above, written in a different way
+		match y.parse()
+		{
+			Ok(h) => {
+				if h >= MAZE_DIMENSION_MIN && h <= MAZE_DIMENSION_MAX
+				{
+					config.dimensions.height = h;
+				}
+			},
+			Err(_e) => {
+				return false;
+			}
+		}
+	}
+
+	true
 }
 
 #[cfg(test)]

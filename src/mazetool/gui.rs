@@ -19,6 +19,7 @@ struct ShowMazeState
 	maze: Arc<Mutex<Maze>>,
 	screen: Rect,
 	block_size: f32,
+	error_text: Option<String>,
 }
 
 impl ShowMazeState
@@ -30,6 +31,7 @@ impl ShowMazeState
 			maze: Arc::new(Mutex::new(Maze::new())), // this is replaced later by real data from Control
 			screen: Rect { x: 0.0, y: 0.0, w: 0.0 , h: 0.0},
 			block_size: 0.0,
+			error_text: None,
 		};
 		Ok(s)
 	}
@@ -41,7 +43,7 @@ impl ShowMazeState
 		if let Ok(m) = self.maze.lock()
 		{
 			self.block_size = (std::cmp::min(self.screen.h as usize / m.dimensions.height,
-			                                self.screen.w as usize / m.dimensions.width)) as f32;
+			                                 self.screen.w as usize / m.dimensions.width)) as f32;
 		}
 	}
 
@@ -94,7 +96,7 @@ impl event::EventHandler<ggez::GameError> for ShowMazeState
 					// draw maze topology graph nodes
 					for i in 0..cell.nodes.len()
 					{
-						if let Some(n) = cell.nodes[i]
+						if let Some(_) = cell.nodes[i]
 						{
 							graphics::draw(ctx, &node, (Vec2::new(pos_x + self.block_size / 2.0,
 							                                      pos_y + self.block_size / 2.0),))?;
@@ -104,35 +106,58 @@ impl event::EventHandler<ggez::GameError> for ShowMazeState
 				}
 			}
 
-			// draw maze topology graph connections
-			info!("Draw topology connections");
-			for (px, py, x, y, _cell) in m.into_iter()
+			// draw maze topology graph connections, if any
+			if m.start != 0
 			{
-				debug!("Maze graph terator returned x = {}, y = {}", x, y);
-				let pos_x = x as f32 * self.block_size + (self.block_size / 2.0);
-				let pos_y = y as f32 * self.block_size + (self.block_size / 2.0);
-				let prev_x = px as f32 * self.block_size + (self.block_size / 2.0);
-				let prev_y = py as f32 * self.block_size + (self.block_size / 2.0);
+				for (px, py, x, y, _cell) in m.into_iter()
+				{
+					debug!("Maze graph terator returned x = {}, y = {}", x, y);
+					let pos_x = x as f32 * self.block_size + (self.block_size / 2.0);
+					let pos_y = y as f32 * self.block_size + (self.block_size / 2.0);
+					let prev_x = px as f32 * self.block_size + (self.block_size / 2.0);
+					let prev_y = py as f32 * self.block_size + (self.block_size / 2.0);
 
-				if (prev_x != pos_x) || (prev_y != pos_y)
-				{
-					let points = &[Vec2::new(prev_x, prev_y), Vec2::new(pos_x, pos_y)];
-					let mut line_width = self.block_size / 10.0;
-					if line_width < 0.6
+					if (prev_x != pos_x) || (prev_y != pos_y)
 					{
-						line_width = 0.6;
+						let points = &[Vec2::new(prev_x, prev_y), Vec2::new(pos_x, pos_y)];
+						let mut line_width = self.block_size / 10.0;
+						if line_width < 0.6
+						{
+							line_width = 0.6;
+						}
+						let connection = graphics::Mesh::new_line(ctx,
+						                                          points,
+						                                          line_width,
+						                                          Color::GREEN)?;
+						graphics::draw(ctx, &connection, (Vec2::new(0.0, 0.0),))?;
 					}
-					let connection = graphics::Mesh::new_line(ctx,
-					                                          points,
-					                                          line_width,
-					                                          Color::GREEN)?;
-					graphics::draw(ctx, &connection, (Vec2::new(0.0, 0.0),))?;
-				}
-				else
-				{
-					info!("Error drawing connections, previous is 0.0");
+					else
+					{
+						info!("Error drawing connections, previous is 0.0");
+					}
 				}
 			}
+		}
+
+		// draw error text, if any
+		if let Some(error_str) = &self.error_text
+		{
+			let mut text =  graphics::Text::new(format!("Error: {}", error_str));
+			text.set_font(graphics::Font::default(), graphics::PxScale::from(72.0));
+			let pos_x = self.screen.w / 2.0 - text.width(ctx) as f32 / 2.0;
+			let pos_y = 200.0;
+			let params = graphics::DrawParam::default()
+				.dest([pos_x, pos_y])
+				.color(graphics::Color::RED);
+
+
+			// draw a white background behind the text
+			let rect = graphics::Rect::new(0.0, 0.0, text.width(ctx), text.height(ctx));
+			let wall = graphics::Mesh::new_rectangle(ctx,
+			                                         graphics::DrawMode::fill(),
+			                                         rect, Color::WHITE)?;
+			graphics::draw(ctx, &wall, (Vec2::new(pos_x, pos_y),))?;
+			graphics::draw(ctx, &text, params).expect("Error drawing text");
 		}
 
 		graphics::present(ctx)?;
@@ -148,32 +173,6 @@ pub struct GraphicalInterface
 	rx: Receiver<UIRequest>,
 }
 
-impl GraphicalInterface
-{
-	/// Show an info message in the user interface
-	///
-	/// # Parameters
-	///
-	/// * `message`       - Information string to show
-	///
-	fn _show_info(&self, message: &str)
-	{
-		println!("{}", message);
-	}
-
-	/// Show an error message in the user interface
-	///
-	/// # Parameters
-	///
-	/// * `error`       - Error string to show
-	///
-	fn _show_error(&self, error: &str)
-	{
-		println!("Error: {}", error);
-	}
-}
-
-
 impl UserInterface for GraphicalInterface
 {
 	/// Create new command line user interface instance
@@ -188,21 +187,31 @@ impl UserInterface for GraphicalInterface
 
 	fn run(&mut self)
 	{
-		let mut window_mode = ggez::conf::WindowMode::default().dimensions(800.0, 600.0);
-		window_mode.fullscreen_type = ggez::conf::FullscreenType::Desktop;
-		//let mut running = true;
+		let window_mode = ggez::conf::WindowMode::default()
+			.dimensions(1920.0, 1080.0)
+			.fullscreen_type(ggez::conf::FullscreenType::True);
+
+		let window_setup = ggez::conf::WindowSetup {
+                               title: "Mazetool".to_owned(),
+                               samples: ggez::conf::NumSamples::One,
+                               vsync: true,
+                               icon: "".to_owned(),
+                               srgb: true,
+		};
+
 		let cb = ggez::ContextBuilder::new("Mazetool", "Mape")
-			//.window_mode(ggez::conf::WindowMode::default().dimensions(800.0, 600.0));
-			.window_mode(window_mode);
+			.window_mode(window_mode)
+			.window_setup(window_setup);
+	    
 		let (mut ctx, event_loop) = cb.build().unwrap();
 		let mut state = ShowMazeState::new().unwrap();
 		let rx_clone = self.rx.clone();
 		let screen = ggez::graphics::screen_coordinates(&ctx);
-		ggez::graphics::set_window_title(&ctx, "Mazetool");
 
 		// Handle events. Refer to `winit` docs for more information.
 		event_loop.run(move |mut event, _window_target, control_flow|
 		{
+			state.set_screen_size(screen);
 			if !ctx.continuing
 			{
 				*control_flow = ControlFlow::Exit;
@@ -213,15 +222,14 @@ impl UserInterface for GraphicalInterface
 				info!("UI received request: {:?}", request);
 				match request
 				{
-					UIRequest::ShowError(_message) => {
-						//self.show_error(&message);
+					UIRequest::ShowError(message) => {
+						state.error_text = Some(message);
 					},
-					UIRequest::ShowInfo(_message) => {
-						//state.show_info(&message);
+					UIRequest::ShowInfo(message) => {
+						state.error_text = Some(message);
 					},
 					UIRequest::ShowMaze(maze) => {
 						state.set_maze(maze);
-						state.set_screen_size(screen);
 					},
 					UIRequest::Quit => {
 						*control_flow = ControlFlow::Exit;

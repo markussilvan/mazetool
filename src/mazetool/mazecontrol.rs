@@ -84,27 +84,7 @@ impl MazeControl
 							};
 						},
 						Job::SolveMaze(method) => {
-							match method
-							{
-								SolveMethod::GraphOnly => {
-									match self.generate_graph()
-									{
-										Ok(_) => info!("Graph generated successfully"),
-										Err(e) => self.show_error(format!("Error generating graph: {}", e))
-									};
-								},
-								SolveMethod::GraphElimination => {
-									match self.generate_graph()
-									{
-										Ok(_) => info!("Graph generated successfully"),
-										Err(e) => self.show_error(format!("Error generating graph: {}", e))
-									};
-									self.run_graph_elimination();
-								},
-								_ => {
-									self.solve_maze();
-								}
-							}
+							self.solve_maze(method);
 						},
 						Job::Quit => {
 							break;
@@ -242,28 +222,64 @@ impl MazeControl
 
 	fn run_graph_elimination(&mut self) -> Result<(), AppError>
 	{
-		match self.maze.lock()
-		{
-			Ok(mut m) => {
-				debug!("Eliminating dead ends from the graph");
-				m.run_graph_elimination();
-			},
-			Err(e) => {
-				self.show_error(e.to_string());
-			},
-		}
+		let mut finished = false;
+		let mut delay: u64 = 100; // abit hacky delay to show progress on the ui
 
-		self.tx.send(UIRequest::ShowMaze(self.maze.clone())).unwrap_or_else(|_| return);
+		while !finished
+		{
+			match self.maze.lock()
+			{
+				Ok(mut m) => {
+					debug!("Eliminating dead ends from the graph");
+					finished = !m.run_graph_elimination(true);
+					delay = 100 - m.dimensions.width as u64;
+				},
+				Err(e) => {
+					self.show_error(e.to_string());
+				},
+			}
+			self.tx.send(UIRequest::ShowMaze(self.maze.clone())).unwrap_or_else(|_| return);
+			std::thread::sleep(std::time::Duration::from_millis(delay));
+		}
 		Ok(())
 	}
 
-	/// Solve an already generated maze
+	/// Solve an already generated maze.
 	///
-	/// Find a path through the maze
-	fn solve_maze(&mut self)
+	/// Find a path through the maze.
+	///
+	/// # Parameters
+	/// * `method`      - Method to use to solve the maze
+	/// 
+	fn solve_maze(&mut self, method: SolveMethod)
 	{
-		self.show_error("Solving a maze is not yet implemented".to_string());
-		self.quit();
+		std::thread::sleep(std::time::Duration::from_millis(1000));
+		match method
+		{
+			SolveMethod::GraphOnly => {
+				match self.generate_graph()
+				{
+					Ok(_) => info!("Graph generated successfully"),
+					Err(e) => self.show_error(format!("Error generating graph: {}", e))
+				};
+			},
+			SolveMethod::GraphElimination => {
+				match self.generate_graph()
+				{
+					Ok(_) => info!("Graph generated successfully"),
+					Err(e) => self.show_error(format!("Error generating graph: {}", e))
+				};
+				match self.run_graph_elimination()
+				{
+					Ok(_) => info!("Graph elimination successful"),
+					Err(e) => self.show_error(format!("Error with graph elimination: {}", e))
+				}
+			},
+			SolveMethod::AStar => {
+				self.show_error("AStar pathfinding is not implemented".to_string());
+				self.quit();
+			}
+		}
 	}
 
 	fn quit(&mut self)

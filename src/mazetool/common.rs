@@ -5,6 +5,7 @@ use std::error::Error;
 use std::io::Error as IOError;
 use std::num::ParseIntError;
 use std::sync::{ Arc, Mutex };
+use std::str::FromStr;
 
 use super::maze::{ Dimensions, Maze };
 
@@ -13,7 +14,21 @@ pub enum SolveMethod
 {
 	GraphOnly,
 	GraphElimination,
-	_AStar
+	AStar
+}
+
+impl FromStr for SolveMethod
+{
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<SolveMethod, Self::Err> {
+        match input {
+            "GraphOnly"         => Ok(SolveMethod::GraphOnly),
+            "GraphElimination"  => Ok(SolveMethod::GraphElimination),
+            "AStar"             => Ok(SolveMethod::AStar),
+            _                   => Err(()),
+        }
+    }
 }
 
 /// Commands given by the user (interface) to the control logic
