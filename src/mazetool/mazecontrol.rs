@@ -244,6 +244,30 @@ impl MazeControl
 		Ok(())
 	}
 
+	fn run_a_star(&mut self) -> Result<(), AppError>
+	{
+		let mut finished = false;
+		let mut delay: u64 = 100; // abit hacky delay to show progress on the ui
+
+		while !finished
+		{
+			match self.maze.lock()
+			{
+				Ok(mut m) => {
+					finished = m.run_a_star(true);
+					delay = 100 - m.dimensions.width as u64;
+				},
+				Err(e) => {
+					self.show_error(e.to_string());
+				},
+			}
+			self.tx.send(UIRequest::ShowMaze(self.maze.clone())).unwrap_or_else(|_| return);
+			std::thread::sleep(std::time::Duration::from_millis(delay));
+		}
+
+		Ok(())
+	}
+
 	/// Solve an already generated maze.
 	///
 	/// Find a path through the maze.
@@ -276,15 +300,18 @@ impl MazeControl
 				}
 			},
 			SolveMethod::AStar => {
-				self.show_error("AStar pathfinding is not implemented".to_string());
-				self.quit();
+				match self.run_a_star()
+				{
+					Ok(_) => info!("A* successful"),
+					Err(e) => self.show_error(format!("Error with A*: {}", e))
+				}
 			}
 		}
 	}
 
-	fn quit(&mut self)
-	{
-		self.tx.send(UIRequest::Quit).unwrap_or_else(|_| return);
-		self.running = false;
-	}
+	//fn quit(&mut self)
+	//{
+	//	self.tx.send(UIRequest::Quit).unwrap_or_else(|_| return);
+	//	self.running = false;
+	//}
 }

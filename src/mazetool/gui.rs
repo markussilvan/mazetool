@@ -66,8 +66,16 @@ impl event::EventHandler<ggez::GameError> for ShowMazeState
 		let rect = graphics::Rect::new(0.0, 0.0, self.block_size, self.block_size);
 		let wall = graphics::Mesh::new_rectangle(ctx,
 		                                         graphics::DrawMode::fill(),
-		                                         rect, Color::WHITE)?;
-
+		                                         rect,
+		                                         Color::WHITE)?;
+		let route = graphics::Mesh::new_rectangle(ctx,
+		                                          graphics::DrawMode::fill(),
+		                                          rect,
+		                                          Color::GREEN)?;
+		let visited = graphics::Mesh::new_rectangle(ctx,
+		                                            graphics::DrawMode::fill(),
+		                                            rect,
+		                                            Color {r: 0.0, g: 0.5, b: 0.5, a: 1.0 })?;
 		let node = graphics::Mesh::new_circle(ctx,
 		                                      graphics::DrawMode::fill(),
 		                                      Vec2::new(0.0, 0.0),
@@ -92,6 +100,14 @@ impl event::EventHandler<ggez::GameError> for ShowMazeState
 					{
 						graphics::draw(ctx, &wall, (Vec2::new(pos_x, pos_y),))?;
 					}
+					if cell.on_route
+					{
+						graphics::draw(ctx, &route, (Vec2::new(pos_x, pos_y),))?;
+					}
+					else if cell.visited
+					{
+						graphics::draw(ctx, &visited, (Vec2::new(pos_x, pos_y),))?;
+					}
 
 					// draw maze topology graph nodes
 					for i in 0..cell.nodes.len()
@@ -107,11 +123,11 @@ impl event::EventHandler<ggez::GameError> for ShowMazeState
 			}
 
 			// draw maze topology graph connections, if any
-			if m.start != 0
+			if m.graph_created == true
 			{
 				for (px, py, x, y, _cell) in m.into_iter()
 				{
-					debug!("Maze graph terator returned x = {}, y = {}", x, y);
+					debug!("Maze graph iterator returned x = {}, y = {}", x, y);
 					let pos_x = x as f32 * self.block_size + (self.block_size / 2.0);
 					let pos_y = y as f32 * self.block_size + (self.block_size / 2.0);
 					let prev_x = px as f32 * self.block_size + (self.block_size / 2.0);
@@ -225,8 +241,8 @@ impl UserInterface for GraphicalInterface
 					UIRequest::ShowError(message) => {
 						state.error_text = Some(message);
 					},
-					UIRequest::ShowInfo(message) => {
-						state.error_text = Some(message);
+					UIRequest::ShowInfo(_message) => {
+						//state.error_text = Some(message);
 					},
 					UIRequest::ShowMaze(maze) => {
 						state.set_maze(maze);

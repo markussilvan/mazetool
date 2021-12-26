@@ -1,6 +1,6 @@
 [package]
 name = "mazetool"
-version = "0.1.0"
+version = "0.2.0"
 authors = [ "Markus Silván <msilvan@iki.fi>" ]
 readme = "README.md"
 edition = "2021"
@@ -16,3 +16,5 @@ glam = "0.17.3"
 winit = "0.25.0"
 
 crossbeam = "0.8.1"
+
+heapless = "0.7.9"

@@ -5,15 +5,18 @@ use std::io::prelude::*;
 use std::io::{self, BufRead};
 use std::path::Path;
 use std::str::FromStr;
+use std::cmp::Ordering;
 
 use rand::prelude::*;
+use heapless::binary_heap::{ BinaryHeap, Min };
 
 use super::common::AppError;
 
 pub const NUM_OF_DIRECTIONS: usize = 4;
-pub const MAZE_DIMENSION_MIN : usize = 10;
-pub const MAZE_DIMENSION_MAX : usize = 10000;
-pub const MAZE_DIMENSION_DEFAULT : usize = 19;
+pub const MAZE_DIMENSION_MIN: usize = 10;
+pub const MAZE_DIMENSION_MAX: usize = 10000;
+pub const MAZE_DIMENSION_DEFAULT: usize = 19;
+pub const MAX_HEAP_SIZE: usize = 128;
 
 #[derive(Clone, Copy)]
 enum GraphNodeType
@@ -158,6 +161,7 @@ pub struct MazeCell
 {
 	pub celltype: MazeCellType,
 	pub visited: bool,
+	pub on_route: bool,
 	pub nodes: [Option<usize>; NUM_OF_DIRECTIONS],
 }
 
@@ -165,7 +169,7 @@ impl Display for MazeCell
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result
 	{
-        write!(f, "{}-{}", self.celltype, self.visited)
+        write!(f, "{}-{}-{}", self.celltype, self.visited, self.on_route)
     }
 }
 
@@ -176,6 +180,8 @@ pub struct Maze
 	pub dimensions: Dimensions,
 	pub cells: Vec<MazeCell>,
 	pub start: usize,
+	pub end: usize,
+	pub graph_created: bool,
 }
 
 impl std::fmt::Debug for Maze
@@ -194,6 +200,7 @@ impl Maze
 		let default_cell = MazeCell {
 			celltype: MazeCellType::Wall,
 			visited: false,
+			on_route: false,
 			nodes: [None; NUM_OF_DIRECTIONS]};
 		let maze = Maze {
 			cells: vec![default_cell; MAZE_DIMENSION_DEFAULT * MAZE_DIMENSION_DEFAULT],
@@ -202,6 +209,8 @@ impl Maze
 				height: MAZE_DIMENSION_DEFAULT
 			},
 			start: 0,
+			end: 0,
+			graph_created: false,
 		};
 
 		return maze;
@@ -294,7 +303,7 @@ impl Maze
 	/// Save an already generated maze to a file
 	///
 	/// # Parameters
-	/// 
+	///
 	/// * `filename`        - Target filename for saving the maze
 	///
 	/// Returns AppError on failure.
@@ -357,6 +366,7 @@ impl Maze
 			let default_cell = MazeCell {
 				celltype: MazeCellType::Wall,
 				visited: false,
+				on_route: false,
 				nodes: [None; NUM_OF_DIRECTIONS]};
 			self.cells.resize(new_size, default_cell);
 		}
@@ -365,6 +375,7 @@ impl Maze
 		{
 			self.cells[i].celltype = MazeCellType::Wall;
 			self.cells[i].visited = false;
+			self.cells[i].on_route = false;
 		}
 
 		debug!("Maze reset to new size: {} x {}, cells len: {}",
@@ -483,6 +494,9 @@ impl Maze
 
 		self.cells[start_pos].celltype = MazeCellType::Start;
 		self.cells[end_pos].celltype = MazeCellType::End;
+
+		self.start = start_pos;
+		self.end = end_pos;
 	}
 
 	fn is_wall_or_end_position(&self, position: usize) -> bool
@@ -585,6 +599,179 @@ impl Maze
 		return position;
 	}
 
+	fn get_neighbours(&self, position: usize) -> Vec<usize>
+	{
+		let directions: Vec<Direction> = Direction::get_directions().iter().cloned().collect();
+		let mut neighbours: Vec<usize> = Vec::new();
+
+		for test_direction in directions
+		{
+			if let Ok(pos) = self.get_neighboring_position(position, test_direction)
+			{
+				if self.cells[pos].celltype != MazeCellType::Wall
+				{
+					neighbours.push(pos);
+				}
+			}
+		}
+
+		neighbours
+	}
+
+	fn manhattan_distance(&self, x: usize, y: usize) -> usize
+	{
+		let mut v = 0;
+		let mut h = 0;
+
+		if x < y
+		{
+			v = (y - x) / self.dimensions.width;
+			h = (y - x) % self.dimensions.width;
+		}
+		else if x > y
+		{
+			v = (x - y) / self.dimensions.width;
+			h = (x - y) % self.dimensions.width;
+		}
+
+		return v + h;
+	}
+
+	pub fn run_a_star(&mut self, step: bool) -> bool
+	{
+		#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+		struct ListItem
+		{
+			position: usize,
+			parent: usize,
+			f: usize,
+			g: usize,
+			h: usize,
+		}
+
+		impl Ord for ListItem {
+			fn cmp(&self, other: &Self) -> Ordering {
+				if self.f == other.f
+				{
+					Ordering::Equal
+				}
+				else if self.f > other.f
+				{
+					Ordering::Greater
+				}
+				else
+				{
+					Ordering::Less
+				}
+			}
+		}
+
+		impl PartialOrd for ListItem {
+			fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+				Some(self.cmp(other))
+			}
+		}
+
+		static mut OPEN_LIST: BinaryHeap<ListItem, Min, MAX_HEAP_SIZE> = BinaryHeap::new();
+		static mut CLOSED_LIST: Vec<ListItem> = Vec::new();
+
+		let mut finished = false;
+
+		unsafe
+		{
+			if OPEN_LIST.len() == 0
+			{
+				let start: ListItem = ListItem { position: self.start, parent: 0, f: 0, g: 0, h: 0 };
+				match OPEN_LIST.push(start)
+				{
+					Ok(_) => {},
+					Err(_) => {},
+				}
+				CLOSED_LIST.push(start);
+			}
+
+			while OPEN_LIST.len() > 0
+			{
+				let item = OPEN_LIST.pop().unwrap();
+
+				self.cells[item.position].visited = true;
+
+				let mut successors : Vec<ListItem> = Vec::new();
+				for p in self.get_neighbours(item.position)
+				{
+					if p != item.parent
+					{
+						successors.push(ListItem { position: p, parent: item.position, f: 0, g: 0, h: 0 });
+					}
+				}
+
+				while let Some(mut s) = successors.pop()
+				{
+					s.g = item.g + 1;
+					s.h = self.manhattan_distance(s.position, self.end);
+					s.f = s.g + s.h;
+					s.parent = item.position;
+
+					if self.cells[s.position].celltype == MazeCellType::End
+					{
+						self.cells[s.position].visited = true;
+						CLOSED_LIST.push(s);
+
+						// only one route through the maze, no need to continue
+						OPEN_LIST.clear();
+						break;
+					}
+
+					CLOSED_LIST.push(s);
+
+					if let Some(_old) = OPEN_LIST.iter().find(|x| (x.position == s.position) && (x.f < s.f))
+					{
+						// skip, there is already a shorter way to get there
+						continue;
+					}
+
+					if let Some(_old) = CLOSED_LIST.iter().find(|x| (x.position == s.position) && (x.f < s.f))
+					{
+						// skip, there is already a shorter way to get there
+						continue;
+					}
+
+					OPEN_LIST.push(s).unwrap();
+				}
+
+				if step == true
+				{
+					break
+				}
+			}
+
+			// if finished, mark the route (quick'n'dirty)
+			if OPEN_LIST.len() == 0
+			{
+				let mut parent = CLOSED_LIST.last().unwrap().position;
+				let mut found = true;
+				while found && (parent != 0)
+				{
+					found = false;
+					for item in CLOSED_LIST.iter().rev()
+					{
+						if item.position == parent
+						{
+							self.cells[item.position].on_route = true;
+							parent = item.parent;
+							found = true;
+							break;
+						}
+					}
+				}
+
+				finished = true;
+			}
+		}
+
+		finished
+	}
+
 	pub fn run_graph_elimination(&mut self, step: bool) -> bool
 	{
 		for i in self.dimensions.width..(self.cells.len() - self.dimensions.width)
@@ -657,16 +844,8 @@ impl Maze
 	{
 		let mut stack: Vec<(usize, usize, Direction)> = Vec::new();
 
-		// find start position
-		for i in 0..self.dimensions.width
-		{
-			if self.cells[i].celltype == MazeCellType::Start
-			{
-				self.start = i;
-				stack.push((i, i, Direction::South)); // only way from the start is south
-				break;
-			}
-		}
+		// add start position to the stack (only way from the start is south)
+		stack.push((self.start, self.start, Direction::South));
 
 		while let Some((previous, position, direction)) = stack.pop()
 		{
@@ -696,6 +875,8 @@ impl Maze
 				},
 			}
 		}
+
+		self.graph_created = true;
 	}
 
 	fn check_passage(&self, position: usize, direction: Direction) -> GraphNodeInfo
