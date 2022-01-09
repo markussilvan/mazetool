@@ -6,5 +6,5 @@ use super::common::{ Job, UIRequest };
 pub trait UserInterface
 {
 	fn new(tx: Sender<Job>, rx: Receiver<UIRequest>) -> Self;
-	fn run(&mut self);
+	fn run(&mut self, show_distances: bool);
 }

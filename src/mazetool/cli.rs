@@ -131,7 +131,7 @@ impl UserInterface for CommandLineInterface
 		}
 	}
 
-	fn run(&mut self)
+	fn run(&mut self, _show_distances: bool)
 	{
 		loop
 		{

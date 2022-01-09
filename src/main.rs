@@ -29,6 +29,7 @@ use mazetool::common::SolveMethod;
 struct Config
 {
 	use_gui: bool,
+	show_distances: bool,
 	solve: Option<SolveMethod>,
 	dimensions: Dimensions,
 }
@@ -39,6 +40,7 @@ impl Config
 	{
 		Config {
 			use_gui: false,
+			show_distances: false,
 			solve: None,
 			dimensions: Dimensions {
 				width: MAZE_DIMENSION_DEFAULT,
@@ -91,12 +93,12 @@ fn main()
 	if config.use_gui
 	{
 		let mut ui = Box::new(GraphicalInterface::new(from_ui_tx.clone(), to_ui_rx));
-		ui.run();
+		ui.run(config.show_distances);
 	}
 	else
 	{
 		let mut ui = Box::new(CommandLineInterface::new(from_ui_tx.clone(), to_ui_rx));
-		ui.run();
+		ui.run(false);
 	};
 
 	//if let Some(solve_method) = config.solve
@@ -121,7 +123,8 @@ fn parse_args(config: &mut Config) -> bool
 	                      .about("Maze generating and solving tool")
 	                      .setting(AppSettings::SubcommandRequiredElseHelp)
 	                      .args_from_usage("
-	                           --gui                'Use graphical interface'")
+	                           --gui                'Use graphical interface'
+	                           --distances          'Show calculated manhattan distances'")
 	                      .subcommand(SubCommand::with_name("generate")
 	                                      .about("generates a new maze")
 	                                      .arg(Arg::with_name("x")
@@ -148,6 +151,10 @@ fn parse_args(config: &mut Config) -> bool
 	if matches.is_present("gui")
 	{
 		config.use_gui = true;
+		if matches.is_present("distances")
+		{
+			config.show_distances = true;
+		}
 	}
 	else
 	{

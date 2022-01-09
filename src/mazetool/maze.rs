@@ -163,6 +163,7 @@ pub struct MazeCell
 	pub visited: bool,
 	pub on_route: bool,
 	pub nodes: [Option<usize>; NUM_OF_DIRECTIONS],
+	pub text: String,
 }
 
 impl Display for MazeCell
@@ -201,7 +202,8 @@ impl Maze
 			celltype: MazeCellType::Wall,
 			visited: false,
 			on_route: false,
-			nodes: [None; NUM_OF_DIRECTIONS]};
+			nodes: [None; NUM_OF_DIRECTIONS],
+			text: String::new()};
 		let maze = Maze {
 			cells: vec![default_cell; MAZE_DIMENSION_DEFAULT * MAZE_DIMENSION_DEFAULT],
 			dimensions: Dimensions {
@@ -367,7 +369,8 @@ impl Maze
 				celltype: MazeCellType::Wall,
 				visited: false,
 				on_route: false,
-				nodes: [None; NUM_OF_DIRECTIONS]};
+				nodes: [None; NUM_OF_DIRECTIONS],
+				text: String::new()};
 			self.cells.resize(new_size, default_cell);
 		}
 
@@ -618,21 +621,21 @@ impl Maze
 		neighbours
 	}
 
+	fn convert_position_to_coordinates(&self, position: usize) -> Dimensions
+	{
+		let x = position / self.dimensions.width;
+		let y = position % self.dimensions.width;
+
+		Dimensions { width: x, height: y }
+	}
+
 	fn manhattan_distance(&self, x: usize, y: usize) -> usize
 	{
-		let mut v = 0;
-		let mut h = 0;
+		let a = self.convert_position_to_coordinates(x);
+		let b = self.convert_position_to_coordinates(y);
 
-		if x < y
-		{
-			v = (y - x) / self.dimensions.width;
-			h = (y - x) % self.dimensions.width;
-		}
-		else if x > y
-		{
-			v = (x - y) / self.dimensions.width;
-			h = (x - y) % self.dimensions.width;
-		}
+		let v = i32::abs(a.height as i32 - b.height as i32) as usize;
+		let h = i32::abs(a.width as i32 - b.width as i32) as usize;
 
 		return v + h;
 	}
@@ -701,16 +704,19 @@ impl Maze
 				{
 					if p != item.parent
 					{
-						successors.push(ListItem { position: p, parent: item.position, f: 0, g: 0, h: 0 });
+						successors.push(ListItem {
+							position: p,
+							parent: item.position,
+							f: 0,
+							g: item.g + 1,
+							h: self.manhattan_distance(p, self.end) });
 					}
 				}
 
 				while let Some(mut s) = successors.pop()
 				{
-					s.g = item.g + 1;
-					s.h = self.manhattan_distance(s.position, self.end);
+					//s.f = s.g + (2 * s.h); // weighted to prefer routes closer to exit
 					s.f = s.g + s.h;
-					s.parent = item.position;
 
 					if self.cells[s.position].celltype == MazeCellType::End
 					{
@@ -722,6 +728,7 @@ impl Maze
 						break;
 					}
 
+					self.cells[s.position].text = format!("{}", s.h).to_string();
 					CLOSED_LIST.push(s);
 
 					if let Some(_old) = OPEN_LIST.iter().find(|x| (x.position == s.position) && (x.f < s.f))

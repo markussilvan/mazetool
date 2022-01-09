@@ -20,6 +20,7 @@ struct ShowMazeState
 	screen: Rect,
 	block_size: f32,
 	error_text: Option<String>,
+	show_distances: bool,
 }
 
 impl ShowMazeState
@@ -32,6 +33,7 @@ impl ShowMazeState
 			screen: Rect { x: 0.0, y: 0.0, w: 0.0 , h: 0.0},
 			block_size: 0.0,
 			error_text: None,
+			show_distances: false,
 		};
 		Ok(s)
 	}
@@ -52,6 +54,21 @@ impl ShowMazeState
 		self.maze = maze.clone();
 	}
 
+	fn set_show_distances(&mut self, show_distances: bool)
+	{
+		self.show_distances = show_distances;
+	}
+
+	fn draw_text(&self, ctx: &mut Context, text_str: &String, pos_x: f32, pos_y: f32)
+	{
+		let mut text =  graphics::Text::new(format!("{}", text_str));
+		text.set_font(graphics::Font::default(), graphics::PxScale::from(24.0));
+		let params = graphics::DrawParam::default()
+			.dest([pos_x, pos_y])
+			.color(graphics::Color::YELLOW);
+
+		graphics::draw(ctx, &text, params).expect("Error drawing text");
+	}
 }
 
 impl event::EventHandler<ggez::GameError> for ShowMazeState
@@ -107,6 +124,10 @@ impl event::EventHandler<ggez::GameError> for ShowMazeState
 					else if cell.visited
 					{
 						graphics::draw(ctx, &visited, (Vec2::new(pos_x, pos_y),))?;
+					}
+					if self.show_distances && (cell.celltype == MazeCellType::Passage)
+					{
+						self.draw_text(ctx, &cell.text, pos_x, pos_y);
 					}
 
 					// draw maze topology graph nodes
@@ -201,7 +222,7 @@ impl UserInterface for GraphicalInterface
 		}
 	}
 
-	fn run(&mut self)
+	fn run(&mut self, show_distances: bool)
 	{
 		let window_mode = ggez::conf::WindowMode::default()
 			.dimensions(1920.0, 1080.0)
@@ -228,6 +249,7 @@ impl UserInterface for GraphicalInterface
 		event_loop.run(move |mut event, _window_target, control_flow|
 		{
 			state.set_screen_size(screen);
+			state.set_show_distances(show_distances);
 			if !ctx.continuing
 			{
 				*control_flow = ControlFlow::Exit;
