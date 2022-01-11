@@ -54,7 +54,19 @@ impl CommandLineInterface
 				{
 					for j in 0..m.dimensions.width
 					{
-						print!("{}", m.cells[j + (i * m.dimensions.width)].celltype);
+						let cell = &m.cells[j + (i * m.dimensions.width)];
+						if cell.on_route
+						{
+							print!("o");
+						}
+						else if cell.visited
+						{
+							print!(".");
+						}
+						else
+						{
+							print!("{}", cell.celltype);
+						}
 					}
 					println!("");
 				}

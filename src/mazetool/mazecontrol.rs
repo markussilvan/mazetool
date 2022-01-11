@@ -264,7 +264,6 @@ impl MazeControl
 			self.tx.send(UIRequest::ShowMaze(self.maze.clone())).unwrap_or_else(|_| return);
 			std::thread::sleep(std::time::Duration::from_millis(delay));
 		}
-
 		Ok(())
 	}
 
@@ -274,7 +273,7 @@ impl MazeControl
 	///
 	/// # Parameters
 	/// * `method`      - Method to use to solve the maze
-	/// 
+	///
 	fn solve_maze(&mut self, method: SolveMethod)
 	{
 		std::thread::sleep(std::time::Duration::from_millis(1000));
