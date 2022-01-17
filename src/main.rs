@@ -1,7 +1,6 @@
-//! Mazetool 
+//! Mazetool
 
-//#![feature(external_doc)]
-//#[doc(include = "../README.md")]
+#[doc = include_str!("../README.md")]
 
 #[macro_use]
 extern crate log;
