@@ -53,7 +53,10 @@ impl Config
 fn main()
 {
 	//SimpleLogger::new().with_level(LevelFilter::Off).init().unwrap_or_else(|_| ::std::process::exit(1));
-	SimpleLogger::new().with_level(LevelFilter::Info).init().unwrap_or_else(|_| ::std::process::exit(1));
+	SimpleLogger::new()
+        .with_level(LevelFilter::Info)
+        .with_utc_timestamps()
+        .init().unwrap_or_else(|_| ::std::process::exit(1));
 
 	// from_ui_tx - send from ui to control
 	// from_ui_rx - receive from ui to control
