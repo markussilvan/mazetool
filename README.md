@@ -1,7 +1,7 @@
 # Mazetool
 
 A tool to generate mazes of arbitrary size and a pathfinding algorithm to find
-routes through the maze.
+a route through the maze.
 
 The design of the software is overcomplicated for the reason of just doing
 this a Rust learning experience. Data structures for the maze are also not
@@ -9,7 +9,7 @@ the most efficient design.
 
 ## Environment setup
 
-Source is available in git, `ssh://nitro.dy.fi:/data/git/playground.git`.
+Source is available in git, `ssh://github.com/markussilvan/mazetool.git`.
 Install CMake, Rust and Cargo.
 
 To use rust-analyzer in Vim, rust-src must also be installed and
@@ -23,21 +23,14 @@ Building is as simple as running `cargo build` anywhere in the source tree.
 
 ## Running
 
-Just do `cargo run -- generate 99 39`.
-This uses a lot of stack space, maybe even more then expected for this
-level of recursion.
-
-`RUSTFLAGS="-C link-args=-zstack-size=16000000" cargo run -- generate 100 300 >foo`
-can be used to run the maze generation with an increase the stack size.
-This shouldn't needed as the maze generation algorithm is not recursive
-anymore.
+Just do `cargo run -- generate 39 39`.
 
 ## Testing
 
-This project is not heavy on testing. Currently there aren't any tests implemented.
+This project is not heavy on testing. Currently there aren't any real tests implemented.
 Some simple tests could be implemented just to try it out.
 
-Run tests (if any) using `cargo test`.
+Run tests using `cargo test`.
 
 ## Documentation
 
