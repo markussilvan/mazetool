@@ -4,6 +4,7 @@ version = "0.2.0"
 authors = [ "Markus Silván <msilvan@iki.fi>" ]
 readme = "README.md"
 edition = "2021"
+license = "MIT"
 
 [dependencies]
 log = "0.4"
